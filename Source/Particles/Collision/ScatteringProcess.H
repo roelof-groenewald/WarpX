@@ -1,18 +1,20 @@
-/* Copyright 2021 Modern Electron
+/* Copyright 2021-2022 The WarpX Community
  *
  * This file is part of WarpX.
  *
+ * Authors: Modern Electron, Roelof Groenewald (TAE Technologies)
+ *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef WARPX_PARTICLES_COLLISION_MCCPROCESS_H_
-#define WARPX_PARTICLES_COLLISION_MCCPROCESS_H_
+#ifndef WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
+#define WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 
 #include <AMReX_Math.H>
 #include <AMReX_Vector.H>
 #include <AMReX_RandomEngine.H>
 #include <AMReX_GpuContainers.H>
 
-enum class MCCProcessType {
+enum class ScatteringProcessType {
     INVALID,
     ELASTIC,
     BACK,
@@ -21,28 +23,28 @@ enum class MCCProcessType {
     IONIZATION,
 };
 
-class MCCProcess
+class ScatteringProcess
 {
 public:
-    MCCProcess (
+    ScatteringProcess (
                 const std::string& scattering_process,
                 const std::string& cross_section_file,
                 amrex::ParticleReal energy
                 );
 
     template <typename InputVector>
-    MCCProcess (
+    ScatteringProcess (
                 const std::string& scattering_process,
                 const InputVector&& energies,
                 const InputVector&& sigmas,
                 amrex::ParticleReal energy
                 );
 
-    MCCProcess (MCCProcess const&) = delete;
-    MCCProcess& operator= (MCCProcess const&) = delete;
+    // ScatteringProcess (ScatteringProcess const&) = delete;
+    // ScatteringProcess& operator= (ScatteringProcess const&) = delete;
 
-    MCCProcess (MCCProcess &&) = default;
-    MCCProcess& operator= (MCCProcess &&) = default;
+    // ScatteringProcess (ScatteringProcess &&) = default;
+    // ScatteringProcess& operator= (ScatteringProcess &&) = default;
 
     /** Read the given cross-section data file to memory.
      *
@@ -97,7 +99,7 @@ public:
         amrex::ParticleReal* m_sigmas_data = nullptr;
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
-        MCCProcessType m_type;
+        ScatteringProcessType m_type;
     };
 
     Executor const& executor () const {
@@ -118,12 +120,12 @@ public:
     amrex::ParticleReal getMaxEnergyInput () const { return m_exe_h.m_energy_hi; }
     amrex::ParticleReal getEnergyInputStep () const { return m_exe_h.m_dE; }
 
-    MCCProcessType type () const { return m_exe_h.m_type; }
+    ScatteringProcessType type () const { return m_exe_h.m_type; }
 
 private:
 
     static
-    MCCProcessType parseProcessType(const std::string& process);
+    ScatteringProcessType parseProcessType(const std::string& process);
 
     void init (const std::string& scattering_process, amrex::ParticleReal energy);
 
@@ -139,4 +141,4 @@ private:
     int m_grid_size;
 };
 
-#endif // WARPX_PARTICLES_COLLISION_MCCPROCESS_H_
+#endif // WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_

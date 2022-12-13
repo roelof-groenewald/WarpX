@@ -40,11 +40,11 @@ public:
                 amrex::ParticleReal energy
                 );
 
-    // ScatteringProcess (ScatteringProcess const&) = delete;
-    // ScatteringProcess& operator= (ScatteringProcess const&) = delete;
+    ScatteringProcess (ScatteringProcess const&) = delete;
+    ScatteringProcess& operator= (ScatteringProcess const&) = delete;
 
-    // ScatteringProcess (ScatteringProcess &&) = default;
-    // ScatteringProcess& operator= (ScatteringProcess &&) = default;
+    ScatteringProcess (ScatteringProcess &&) = default;
+    ScatteringProcess& operator= (ScatteringProcess &&) = default;
 
     /** Read the given cross-section data file to memory.
      *

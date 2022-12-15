@@ -2967,7 +2967,9 @@ void PhysicalParticleContainer::resample (const int timestep)
     WARPX_PROFILE_VAR_START(blp_resample_actual);
     if (m_resampler.triggered(timestep, global_numparts))
     {
-        amrex::Print() << Utils::TextMsg::Info("Resampling " + species_name);
+        amrex::Print() << Utils::TextMsg::Info(
+            "Resampling " + species_name + " at step " + std::to_string(timestep)
+        );
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)

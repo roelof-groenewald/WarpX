@@ -2977,6 +2977,8 @@ void PhysicalParticleContainer::resample (const int timestep)
                 m_resampler(pti, lev, this);
             }
         }
+        // Redistribute to remove particles with negative ids
+        Redistribute();
     }
     WARPX_PROFILE_VAR_STOP(blp_resample_actual);
 

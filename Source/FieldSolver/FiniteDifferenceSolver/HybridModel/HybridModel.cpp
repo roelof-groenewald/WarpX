@@ -43,6 +43,10 @@ void HybridModel::ReadParameters ()
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
+
+    // When a small cell resolution is used it is necessary to filter the
+    // B-field before calculating the total current (curl x B).
+    pp_hybrid.query("filter_B", m_filter_B_for_total_current);
 }
 
 void HybridModel::InitData ()

@@ -415,6 +415,9 @@ WarpX::InitData ()
 
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Hybrid) {
         m_hybrid_model->InitData();
+        if (!use_filter && m_hybrid_model->m_filter_B_for_total_current ){
+            amrex::Abort("Must use filter to filter B-field before total current calculation.");
+        }
     }
 
     InitDiagnostics();

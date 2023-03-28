@@ -845,6 +845,13 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, DtType a_dt_typ
         }
     }
 
+    if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Hybrid){
+        // If the hybrid solver is used, the B-field might be filtered (to
+        // avoid large total current values). The B-field boundary will be
+        // applied after the filtering is done.
+        return;
+    }
+
     ApplyBfieldBoundary(lev, patch_type, a_dt_type);
 }
 

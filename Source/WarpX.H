@@ -607,8 +607,8 @@ public:
      * neglecting displacement current (J = curl x B). Used in the Ohm's law
      * solver (kinetic-fluid hybrid model).
      */
-    void CalculateCurrentAmpere ();
-    void CalculateCurrentAmpere (int lev);
+    void CalculateCurrentAmpere (         DtType dt_type);
+    void CalculateCurrentAmpere (int lev, DtType dt_type);
 
     /**
      * \brief

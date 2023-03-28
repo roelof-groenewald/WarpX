@@ -1001,7 +1001,8 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
 
 class EMSolver():
     def __init__(self, grid, method, Te=None, n0=None, gamma=None,
-                 n_floor=None, plasma_resistivity=None, substeps=None):
+                 n_floor=None, plasma_resistivity=None, substeps=None,
+                 filter_B=None):
         self.grid = grid
         self.method = method
 
@@ -1012,6 +1013,8 @@ class EMSolver():
         self.plasma_resistivity = plasma_resistivity
 
         self.substeps = substeps
+
+        self.filter_B = filter_B
 
     def initialize_inputs(self):
 
@@ -1026,6 +1029,7 @@ class EMSolver():
             pywarpx.hybridmodel.n_floor = self.n_floor
             pywarpx.hybridmodel.__setattr__('plasma_resistivity(rho)', self.plasma_resistivity)
             pywarpx.hybridmodel.substeps = self.substeps
+            pywarpx.hybridmodel.filter_B = self.filter_B
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
@@ -1498,7 +1502,7 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_particle_pusher_algo: {'boris', 'vay', 'higuera'}, default='boris'
         Particle pushing algorithm.
 
-    warpx_use_filter: bool, optional
+    warpx_use_filter: bool or `BinomialSmoother`, optional
         Whether to use filtering. The default depends on the conditions.
 
     warpx_do_multi_J: bool, default=0
@@ -1674,7 +1678,6 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         pywarpx.warpx.grid_type = self.grid_type
         pywarpx.warpx.do_current_centering = self.do_current_centering
-        pywarpx.warpx.use_filter = self.use_filter
         pywarpx.warpx.do_multi_J = self.do_multi_J
         pywarpx.warpx.do_multi_J_n_depositions = self.do_multi_J_n_depositions
         pywarpx.warpx.serialize_initial_conditions = self.serialize_initial_conditions
@@ -1704,6 +1707,11 @@ class Simulation(picmistandard.PICMI_Simulation):
             pywarpx.algo.particle_shape = interpolation_order
 
         self.solver.initialize_inputs()
+
+        if self.use_filter is None or isinstance(self.use_filter, int):
+            pywarpx.warpx.use_filter = self.use_filter
+        else:
+            self.use_filter.initialize_inputs(self.solver)
 
         # Initialize warpx.field_centering_no<x,y,z> and warpx.current_centering_no<x,y,z>
         # if set by the user in the input (need to access grid info from solver attribute)

@@ -81,6 +81,8 @@ public:
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<1> m_eta;
+
+    bool m_filter_B_for_total_current = false;
 };
 
 /**

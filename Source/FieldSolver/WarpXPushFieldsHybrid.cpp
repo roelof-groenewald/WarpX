@@ -6,6 +6,7 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "BoundaryConditions/WarpX_PEC.H"
 #include "Evolve/WarpXDtType.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridModel/HybridModel.H"
@@ -85,10 +86,10 @@ void WarpX::HybridEvolveFields ()
     // momentum equation
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
-        CalculateCurrentAmpere();
+        // CalculateCurrentAmpere(DtType::FirstHalf);
         HybridSolveE(DtType::FirstHalf);
         EvolveB(0.5 / sub_steps * dt[0], DtType::FirstHalf);
-        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+        // FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
     }
 
     // Calculate the electron pressure at t=n+1/2
@@ -97,10 +98,10 @@ void WarpX::HybridEvolveFields ()
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
     for (int sub_step = 0; sub_step < sub_steps; sub_step++)
     {
-        CalculateCurrentAmpere();
+        // CalculateCurrentAmpere(DtType::SecondHalf);
         HybridSolveE(DtType::SecondHalf);
         EvolveB(0.5 / sub_steps * dt[0], DtType::SecondHalf);
-        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+        // FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
     }
 
     // Calculate the electron pressure at t=n+1
@@ -151,7 +152,7 @@ void WarpX::HybridEvolveFields ()
     }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
-    CalculateCurrentAmpere();
+    // CalculateCurrentAmpere(DtType::Full);
     HybridSolveE(DtType::Full);
 
     // Copy the J_i^{n+1/2} values to current_fp_temp since at the next step
@@ -165,28 +166,81 @@ void WarpX::HybridEvolveFields ()
     }
 }
 
-void WarpX::CalculateCurrentAmpere ()
+void WarpX::CalculateCurrentAmpere (DtType dt_type)
 {
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        CalculateCurrentAmpere(lev);
+        CalculateCurrentAmpere(lev, dt_type);
     }
 }
 
-void WarpX::CalculateCurrentAmpere (int lev)
+void WarpX::CalculateCurrentAmpere (int lev, DtType dt_type)
 {
     WARPX_PROFILE("WarpX::CalculateCurrentAmpere()");
-    m_fdtd_solver_fp[lev]->CalculateCurrentAmpere(
-        current_fp_ampere[lev], Bfield_fp[lev],
-        m_edge_lengths[lev], lev
-    );
 
-    // we shouldn't apply the boundary condition to J since J = J_i - J_e but
-    // the boundary correction was already applied to J_i and the B-field
+    // The total current is calculated as the curl of B and directly impacts
+    // the calculated E-field. When the grid spacing is small, noise in B can
+    // therefore lead to very large E-field values. To counteract this, the
+    // B-field is filtered (smoothed) before calculating the total current, if
+    // use_filter is True and B-field smooting is turned on.
+    if (use_filter && m_hybrid_model->m_filter_B_for_total_current) {
+
+        // allocate multifab for the filtered B-field
+        std::array< std::unique_ptr<amrex::MultiFab>, 3 > B_filtered;
+
+        for (int idim=0; idim<3; ++idim)
+        {
+            amrex::MultiFab& B = *Bfield_fp[lev][idim];
+
+            const int ncomp = B.nComp();
+            const amrex::IntVect ngrow = B.nGrowVect();
+            B_filtered[idim] = std::make_unique<amrex::MultiFab>(B.boxArray(), B.DistributionMap(), ncomp, ngrow);
+            bilinear_filter.ApplyStencil(*B_filtered[idim], B, lev);
+        }
+
+        // Apply boundary condition to filtered B-field
+        if (PEC::isAnyBoundaryPEC()) {
+            PEC::ApplyPECtoBfield( { B_filtered[0].get(), B_filtered[1].get(),
+                                     B_filtered[2].get() }, lev, PatchType::fine);
+        }
+        // fill ghost cells with appropriate values
+        for (int idim = 0; idim < 3; ++idim) {
+            B_filtered[idim]->FillBoundary(Geom(lev).periodicity());
+        }
+
+        // Now apply B-field boundary and populate ghost cells.
+        // TODO: Is it really necessary to apply the B-field boundary and ghost cell update?
+        // If the current boundary condition is appropriately applied, wouldn't that force
+        // the B-field boundary to already be correct?
+        ApplyBfieldBoundary(lev, PatchType::fine, dt_type);
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+        m_fdtd_solver_fp[lev]->CalculateCurrentAmpere(
+            current_fp_ampere[lev], B_filtered,
+            m_edge_lengths[lev], lev
+        );
+
+    }
+    else {
+
+        // Now apply B-field boundary and populate ghost cells.
+        // TODO: Is it really necessary to apply the B-field boundary and ghost cell update?
+        // If the current boundary condition is appropriately applied, wouldn't that force
+        // the B-field boundary to already be correct?
+        ApplyBfieldBoundary(lev, PatchType::fine, dt_type);
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+        m_fdtd_solver_fp[lev]->CalculateCurrentAmpere(
+            current_fp_ampere[lev], Bfield_fp[lev],
+            m_edge_lengths[lev], lev
+        );
+    }
+
+    // We shouldn't apply the boundary condition to J since J = J_i - J_e.
+    // The boundary correction was already applied to J_i and the B-field
     // boundary ensures that J itself complies with the boundary conditions
     // ApplyJfieldBoundary(lev, Jfield[0].get(), Jfield[1].get(), Jfield[2].get());
 
-    if (use_filter) ApplyFilterJ(current_fp_ampere, lev);
     for (int i=0; i<3; i++) get_pointer_current_fp_ampere(lev, i)->FillBoundary(Geom(lev).periodicity());
 }
 
@@ -211,45 +265,148 @@ void WarpX::HybridSolveE (int lev, DtType a_dt_type)
     }
 }
 
+// void WarpX::HybridSolveE (int lev, PatchType patch_type, DtType a_dt_type)
+// {
+//     // Solve E field in regular cells
+//     if (a_dt_type == DtType::SecondHalf) {
+//         m_fdtd_solver_fp[lev]->HybridSolveE(
+//             Efield_fp[lev], current_fp_ampere[lev], current_fp[lev],
+//             Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
+//             m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+//         );
+//     }
+//     else {
+//         m_fdtd_solver_fp[lev]->HybridSolveE(
+//             Efield_fp[lev], current_fp_ampere[lev], current_fp_temp[lev],
+//             Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
+//             m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+//         );
+//     }
+
+//     // Evolve E field in PML cells
+//     // if (do_pml && pml[lev]->ok()) {
+//     //     if (patch_type == PatchType::fine) {
+//     //         m_fdtd_solver_fp[lev]->EvolveEPML(
+//     //             pml[lev]->GetE_fp(), pml[lev]->GetB_fp(),
+//     //             pml[lev]->Getj_fp(), pml[lev]->Get_edge_lengths(),
+//     //             pml[lev]->GetF_fp(),
+//     //             pml[lev]->GetMultiSigmaBox_fp(),
+//     //             a_dt, pml_has_particles );
+//     //     } else {
+//     //         m_fdtd_solver_cp[lev]->EvolveEPML(
+//     //             pml[lev]->GetE_cp(), pml[lev]->GetB_cp(),
+//     //             pml[lev]->Getj_cp(), pml[lev]->Get_edge_lengths(),
+//     //             pml[lev]->GetF_cp(),
+//     //             pml[lev]->GetMultiSigmaBox_cp(),
+//     //             a_dt, pml_has_particles );
+//     //     }
+//     // }
+
+//     ApplyEfieldBoundary(lev, patch_type);
+// }
+
+
 void WarpX::HybridSolveE (int lev, PatchType patch_type, DtType a_dt_type)
 {
-    // Solve E field in regular cells
-    if (a_dt_type == DtType::SecondHalf) {
-        m_fdtd_solver_fp[lev]->HybridSolveE(
-            Efield_fp[lev], current_fp_ampere[lev], current_fp[lev],
-            Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
-            m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+
+
+    // The total current is calculated as the curl of B and directly impacts
+    // the calculated E-field. When the grid spacing is small, noise in B can
+    // therefore lead to very large E-field values. To counteract this, the
+    // B-field is filtered (smoothed) before calculating the total current, if
+    // use_filter is True and B-field smooting is turned on.
+    if (use_filter && m_hybrid_model->m_filter_B_for_total_current) {
+
+        // allocate multifab for the filtered B-field
+        std::array< std::unique_ptr<amrex::MultiFab>, 3 > B_filtered;
+
+        for (int idim=0; idim<3; ++idim)
+        {
+            amrex::MultiFab& B = *Bfield_fp[lev][idim];
+
+            const int ncomp = B.nComp();
+            const amrex::IntVect ngrow = B.nGrowVect();
+            B_filtered[idim] = std::make_unique<amrex::MultiFab>(B.boxArray(), B.DistributionMap(), ncomp, ngrow);
+            bilinear_filter.ApplyStencil(*B_filtered[idim], B, lev);
+        }
+
+        // Apply boundary condition to filtered B-field
+        if (PEC::isAnyBoundaryPEC()) {
+            PEC::ApplyPECtoBfield( { B_filtered[0].get(), B_filtered[1].get(),
+                                     B_filtered[2].get() }, lev, PatchType::fine);
+        }
+        // fill ghost cells with appropriate values
+        for (int idim = 0; idim < 3; ++idim) {
+            B_filtered[idim]->FillBoundary(Geom(lev).periodicity());
+        }
+
+        // Now apply B-field boundary and populate ghost cells.
+        // TODO: Is it really necessary to apply the B-field boundary and ghost cell update?
+        // If the current boundary condition is appropriately applied, wouldn't that force
+        // the B-field boundary to already be correct?
+        ApplyBfieldBoundary(lev, PatchType::fine, a_dt_type);
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+        m_fdtd_solver_fp[lev]->CalculateCurrentAmpere(
+            current_fp_ampere[lev], B_filtered,
+            m_edge_lengths[lev], lev
         );
+
+        for (int i=0; i<3; i++) get_pointer_current_fp_ampere(lev, i)->FillBoundary(Geom(lev).periodicity());
+
+        // Solve E field in regular cells
+        if (a_dt_type == DtType::SecondHalf) {
+            m_fdtd_solver_fp[lev]->HybridSolveE(
+                Efield_fp[lev], current_fp_ampere[lev], current_fp[lev],
+                B_filtered, rho_fp[lev], electron_pressure_fp[lev],
+                m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+            );
+        }
+        else {
+            m_fdtd_solver_fp[lev]->HybridSolveE(
+                Efield_fp[lev], current_fp_ampere[lev], current_fp_temp[lev],
+                B_filtered, rho_fp[lev], electron_pressure_fp[lev],
+                m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+            );
+        }
+
     }
     else {
-        m_fdtd_solver_fp[lev]->HybridSolveE(
-            Efield_fp[lev], current_fp_ampere[lev], current_fp_temp[lev],
-            Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
-            m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
-        );
-    }
 
-    // Evolve E field in PML cells
-    // if (do_pml && pml[lev]->ok()) {
-    //     if (patch_type == PatchType::fine) {
-    //         m_fdtd_solver_fp[lev]->EvolveEPML(
-    //             pml[lev]->GetE_fp(), pml[lev]->GetB_fp(),
-    //             pml[lev]->Getj_fp(), pml[lev]->Get_edge_lengths(),
-    //             pml[lev]->GetF_fp(),
-    //             pml[lev]->GetMultiSigmaBox_fp(),
-    //             a_dt, pml_has_particles );
-    //     } else {
-    //         m_fdtd_solver_cp[lev]->EvolveEPML(
-    //             pml[lev]->GetE_cp(), pml[lev]->GetB_cp(),
-    //             pml[lev]->Getj_cp(), pml[lev]->Get_edge_lengths(),
-    //             pml[lev]->GetF_cp(),
-    //             pml[lev]->GetMultiSigmaBox_cp(),
-    //             a_dt, pml_has_particles );
-    //     }
-    // }
+        // Now apply B-field boundary and populate ghost cells.
+        // TODO: Is it really necessary to apply the B-field boundary and ghost cell update?
+        // If the current boundary condition is appropriately applied, wouldn't that force
+        // the B-field boundary to already be correct?
+        ApplyBfieldBoundary(lev, PatchType::fine, a_dt_type);
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+        m_fdtd_solver_fp[lev]->CalculateCurrentAmpere(
+            current_fp_ampere[lev], Bfield_fp[lev],
+            m_edge_lengths[lev], lev
+        );
+
+        for (int i=0; i<3; i++) get_pointer_current_fp_ampere(lev, i)->FillBoundary(Geom(lev).periodicity());
+
+        // Solve E field in regular cells
+        if (a_dt_type == DtType::SecondHalf) {
+            m_fdtd_solver_fp[lev]->HybridSolveE(
+                Efield_fp[lev], current_fp_ampere[lev], current_fp[lev],
+                Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
+                m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+            );
+        }
+        else {
+            m_fdtd_solver_fp[lev]->HybridSolveE(
+                Efield_fp[lev], current_fp_ampere[lev], current_fp_temp[lev],
+                Bfield_fp[lev], rho_fp[lev], electron_pressure_fp[lev],
+                m_edge_lengths[lev], lev, m_hybrid_model, a_dt_type
+            );
+        }
+    }
 
     ApplyEfieldBoundary(lev, patch_type);
 }
+
 
 void WarpX::CalculateElectronPressure(DtType a_dt_type)
 {

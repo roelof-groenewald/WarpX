@@ -273,6 +273,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
 
+    // meta physics parameter to tune two fluid effects
+    amrex::Real alpha;
+    // set to lower val to turn off Hall and Pe
+    alpha = include_resistivity_term ? hybrid_model->m_alpha : 1.0_rt;
+
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
     amrex::GpuArray<int, 3> const& Ex_stag = hybrid_model->Ex_IndexType;
@@ -333,9 +338,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
             // interpolate the total current to a nodal grid
-            auto const jx_interp = Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jy_interp = Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jz_interp = Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jx_interp = alpha * Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jy_interp = alpha * Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jz_interp = alpha * Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
             // interpolate the ion current to a nodal grid
             auto const jix_interp = Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -427,7 +432,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (rho_val < rho_floor) rho_val = rho_floor;
 
                 // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
+                auto grad_Pe = alpha * T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
@@ -457,7 +462,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (rho_val < rho_floor) rho_val = rho_floor;
 
                 // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
+                auto grad_Pe = alpha * T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
@@ -482,7 +487,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (rho_val < rho_floor) rho_val = rho_floor;
 
                 // Get the gradient of the electron pressure
-                auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
+                auto grad_Pe = alpha * T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);

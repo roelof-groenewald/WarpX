@@ -1026,7 +1026,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Number of substeps to take when updating the B-field.
     """
     def __init__(self, grid, Te=None, n0=None, gamma=None,
-                 n_floor=None, plasma_resistivity=None, substeps=None, **kw):
+                 n_floor=None, plasma_resistivity=None, substeps=None,
+                 alpha=None, **kw):
         self.grid = grid
         self.method = "hybrid"
 
@@ -1037,6 +1038,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.plasma_resistivity = plasma_resistivity
 
         self.substeps = substeps
+
+        self.alpha = alpha
 
         self.handle_init(kw)
 
@@ -1054,6 +1057,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             'plasma_resistivity(rho)', self.plasma_resistivity
         )
         pywarpx.hybridpicmodel.substeps = self.substeps
+        pywarpx.hybridpicmodel.alpha = self.alpha
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
@@ -1834,6 +1838,8 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         if self.amrex_the_arena_init_size is not None:
             pywarpx.amrex.the_arena_init_size = self.amrex_the_arena_init_size
+
+        pywarpx.amrex.vector_growth_factor = 1.05
 
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:

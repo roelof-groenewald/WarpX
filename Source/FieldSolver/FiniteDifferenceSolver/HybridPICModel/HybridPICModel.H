@@ -131,6 +131,8 @@ public:
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<1> m_eta;
 
+    amrex::Real m_alpha = 1.0;
+
     // Declare multifabs specifically needed for the hybrid-PIC model
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > rho_fp_temp;
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_temp;

@@ -72,6 +72,8 @@ Uniform plasma
 :download:`2D case <../../../Examples/Physics_applications/uniform_plasma/inputs_2d>`
 :download:`3D case <../../../Examples/Physics_applications/uniform_plasma/inputs_3d>`
 
+.. _examples-mcc-turner:
+
 Capacitive discharge
 --------------------
 

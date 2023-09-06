@@ -131,7 +131,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 #endif
                 // Mode m=0
                 Jr(i, j, 0, 0) = one_over_mu0 * (
-                    - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
+                    - T_Algo::DownwardDz4thOrder(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
                 );
                 // Jr(i, j, 0, 0) = one_over_mu0 * (
                 //     - T_Algo::DownwardDz4thOrder(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
@@ -187,7 +187,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                         - (
                             coefs_r[0] / 24._rt * (-Bz(i+1,j,0,0) + 27._rt*Bz(i,j,0,0) - 26._rt*Bz(i-1,j,0,0))
                         )
-                        + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 0)
+                        + T_Algo::DownwardDz4thOrder(Br, coefs_z, n_coefs_z, i, j, 0, 0)
                     );
                 // r==0: on-axis corrections
                 } else {

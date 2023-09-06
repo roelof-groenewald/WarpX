@@ -104,6 +104,35 @@ struct CylindricalYeeAlgorithm {
         return 1._rt/r * inv_dr*( (r+0.5_rt*dr)*F(i,j,k,comp) - (r-0.5_rt*dr)*F(i-1,j,k,comp) );
     }
 
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DownwardDrr_over_r_4thOrder (
+        amrex::Array4<amrex::Real> const& F,
+        amrex::Real const r, amrex::Real const dr,
+        amrex::Real const * const coefs_r, int const n_coefs_r,
+        int const i, int const j, int const k, int const comp ) {
+
+        using namespace amrex;
+        ignore_unused(n_coefs_r);
+
+        Real const inv_dr = coefs_r[0] / 24.0_rt;
+
+        if (r < 1._rt * dr) {
+            return 1._rt/r * inv_dr*(
+                -(r+1.5_rt*dr)*F(i+1,j,k,comp) + 28._rt*(r+0.5_rt*dr)*F(i,j,k,comp)
+            );
+        }
+        else if (r < 1.5_rt * dr) {
+            return 1._rt/r * inv_dr*(
+                -(r+1.5_rt*dr)*F(i+1,j,k,comp) + 27._rt*(r+0.5_rt*dr)*F(i,j,k,comp)
+                - 26._rt*(r-0.5_rt*dr)*F(i-1,j,k,comp)
+            );
+        }
+        return 1._rt/r * inv_dr*(
+            -(r+1.5_rt*dr)*F(i+1,j,k,comp) + 27._rt*(r+0.5_rt*dr)*F(i,j,k,comp)
+            - 27._rt*(r-0.5_rt*dr)*F(i-1,j,k,comp) + (r-1.5_rt*dr)*F(i-2,j,k,comp)
+        );
+    }
+
     /**
      * Perform derivative along r on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -135,6 +164,30 @@ struct CylindricalYeeAlgorithm {
     }
 
     /**
+     * Perform derivative along r on a nodal grid, from a cell-centered field `F` */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DownwardDr4thOrder (
+        amrex::Array4<amrex::Real> const& F,
+        amrex::Real const r, amrex::Real const dr,
+        amrex::Real const * const coefs_r, int const n_coefs_r,
+        int const i, int const j, int const k, int const comp ) {
+
+        using namespace amrex;
+        ignore_unused(n_coefs_r);
+
+        Real const inv_dr = coefs_r[0] / 24._rt;
+        if (r == dr) {
+            return inv_dr*(
+                -F(i+1,j,k,comp) + 27._rt*F(i,j,k,comp) - 26._rt*F(i-1,j,k,comp)
+            );
+        }
+        return inv_dr*(
+            -F(i+1,j,k,comp) + 27._rt*F(i,j,k,comp) - 27._rt*F(i-1,j,k,comp)
+            +F(i-2,j,k,comp)
+        );
+    }
+
+    /**
      * Perform derivative along z on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
@@ -160,6 +213,24 @@ struct CylindricalYeeAlgorithm {
 
         amrex::Real const inv_dz = coefs_z[0];
         return inv_dz*( F(i,j,k,comp) - F(i,j-1,k,comp) );
+    }
+
+    /**
+     * Perform derivative along z on a nodal grid, from a cell-centered field `F` */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DownwardDz4thOrder (
+        amrex::Array4<amrex::Real> const& F,
+        amrex::Real const * const coefs_z, int const n_coefs_z,
+        int const i, int const j, int const k, int const comp ) {
+
+        using namespace amrex;
+        amrex::ignore_unused(n_coefs_z);
+
+        amrex::Real const inv_dz = coefs_z[0] / 24._rt;
+        return inv_dz*(
+            -F(i,j+1,k,comp) + 27._rt*F(i,j,k,comp) - 27._rt*F(i,j-1,k,comp)
+            +F(i,j-2,k,comp)
+        );
     }
 
 };

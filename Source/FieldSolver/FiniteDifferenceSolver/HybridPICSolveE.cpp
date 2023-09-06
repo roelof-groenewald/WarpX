@@ -133,6 +133,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                 Jr(i, j, 0, 0) = one_over_mu0 * (
                     - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
                 );
+                // Jr(i, j, 0, 0) = one_over_mu0 * (
+                //     - T_Algo::DownwardDz4thOrder(Bt, coefs_z, n_coefs_z, i, j, 0, 0)
+                // );
 
                 // Higher-order modes
                 // r on cell-centered point (Jr is cell-centered in r)
@@ -159,7 +162,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                 // r on a nodal point (Jt is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
-                if (r > 0.5_rt*dr) {
+                if (r > 1.5_rt*dr) {
                     // Mode m=0
                     Jt(i, j, 0, 0) = one_over_mu0 * (
                         - T_Algo::DownwardDr(Bz, coefs_r, n_coefs_r, i, j, 0, 0)
@@ -177,6 +180,15 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                             + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 2*m  )
                         ); // Imaginary part
                     }
+                // r==dr: 4th order difference
+                } else if (r > 0.5_rt*dr) {
+                    Jt(i, j, 0, 0) = one_over_mu0 * (
+                        // - T_Algo::DownwardDr4thOrder(Bz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        - (
+                            coefs_r[0] / 24._rt * (-Bz(i+1,j,0,0) + 27._rt*Bz(i,j,0,0) - 26._rt*Bz(i-1,j,0,0))
+                        )
+                        + T_Algo::DownwardDz(Br, coefs_z, n_coefs_z, i, j, 0, 0)
+                    );
                 // r==0: on-axis corrections
                 } else {
                     // Ensure that Jt remains 0 on axis (except for m=1)
@@ -206,7 +218,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                 // r on a nodal point (Jz is nodal in r)
                 Real const r = rmin + i*dr;
                 // Off-axis, regular curl
-                if (r > 0.5_rt*dr) {
+                if (r > 1.5_rt*dr) {
                     // Mode m=0
                     Jz(i, j, 0, 0) = one_over_mu0 * (
                        T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
@@ -222,6 +234,15 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                             + T_Algo::DownwardDrr_over_r(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )
                         ); // Imaginary part
                     }
+                // r==dr: 4th order difference
+                } else if (r > 0.5_rt*dr) {
+                    Jz(i, j, 0, 0) = one_over_mu0 * (
+                        // T_Algo::DownwardDrr_over_r_4thOrder(Bt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                        1._rt/r * coefs_r[0] / 24.0_rt * (
+                            -(r+1.5_rt*dr)*Bt(i+1,j,0,0) + 27._rt*(r+0.5_rt*dr)*Bt(i,j,0,0)
+                            - 26._rt*(r-0.5_rt*dr)*Bt(i-1,j,0,0)
+                        )
+                    );
                 // r==0: on-axis corrections
                 } else {
                     // For m==0, Bt is linear in r, for small r

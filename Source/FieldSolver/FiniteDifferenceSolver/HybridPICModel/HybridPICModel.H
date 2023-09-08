@@ -65,6 +65,11 @@ public:
         int lev
     );
 
+    void CalculateEquilibCurrent (
+        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Bfield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths
+    );
+
     /**
      * \brief
      * Function to update the E-field using Ohm's law (hybrid-PIC model).
@@ -138,6 +143,7 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_temp;
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_ampere;
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > electron_pressure_fp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_equilib;
 
     // Helper functions to retrieve hybrid-PIC multifabs
     amrex::MultiFab * get_pointer_current_fp_ampere  (int lev, int direction) const { return current_fp_ampere[lev][direction].get(); }

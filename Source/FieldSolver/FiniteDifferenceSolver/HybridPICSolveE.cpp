@@ -369,6 +369,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -382,14 +383,14 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, J_equilib, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, J_equilib, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
@@ -406,6 +407,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -552,6 +554,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
 
+        Array4<Real const> const& Jr_equilib = J_equilib[0]->const_array(mfi);
+        Array4<Real const> const& Jt_equilib = J_equilib[1]->const_array(mfi);
+        Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lr = edge_lengths[0]->array(mfi);
         amrex::Array4<amrex::Real> const& lt = edge_lengths[1]->array(mfi);
@@ -597,7 +603,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * Jr(i, j, 0);
+                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * (Jr(i, j, 0) - Jr_equilib(i, j, 0));
             },
 
             // Et calculation
@@ -631,7 +637,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * Jt(i, j, 0);
+                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0)  - Jt_equilib(i, j, 0));
             },
 
             // Ez calculation
@@ -655,7 +661,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * Jz(i, j, k);
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) -  - Jz_equilib(i, j, 0));
             }
         );
 
@@ -675,6 +681,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -815,6 +822,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
 
+        Array4<Real const> const& Jx_equilib = J_equilib[0]->const_array(mfi);
+        Array4<Real const> const& Jy_equilib = J_equilib[1]->const_array(mfi);
+        Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
         amrex::Array4<amrex::Real> const& ly = edge_lengths[1]->array(mfi);
@@ -857,7 +868,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * Jx(i, j, k);
+                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * (Jx(i, j, k) - Jx_equilib(i, j, k));
             },
 
             // Ey calculation
@@ -887,7 +898,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * Jy(i, j, k);
+                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * (Jy(i, j, k) - Jy_equilib(i, j, k));
             },
 
             // Ez calculation
@@ -911,7 +922,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * Jz(i, j, k);
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k)  - Jz_equilib(i, j, k));
             }
         );
 

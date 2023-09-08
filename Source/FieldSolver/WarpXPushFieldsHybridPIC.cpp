@@ -193,4 +193,5 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
             PatchType::fine
         );
     }
+    m_hybrid_pic_model->CalculateEquilibCurrent(Bfield_fp, m_edge_lengths);
 }

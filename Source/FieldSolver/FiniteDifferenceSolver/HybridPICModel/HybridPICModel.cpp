@@ -50,6 +50,7 @@ void HybridPICModel::AllocateMFs (int nlevs_max)
     rho_fp_temp.resize(nlevs_max);
     current_fp_temp.resize(nlevs_max);
     current_fp_ampere.resize(nlevs_max);
+    current_equilib.resize(nlevs_max);
 }
 
 void HybridPICModel::AllocateLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm,
@@ -86,6 +87,13 @@ void HybridPICModel::AllocateLevelMFs (int lev, const BoxArray& ba, const Distri
         dm, ncomps, ngJ, lev, "current_fp_ampere[y]", 0.0_rt);
     WarpX::AllocInitMultiFab(current_fp_ampere[lev][2], amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, lev, "current_fp_ampere[z]", 0.0_rt);
+
+    WarpX::AllocInitMultiFab(current_equilib[lev][0], amrex::convert(ba, jx_nodal_flag),
+        dm, ncomps, ngJ, lev, "current_equilib[x]", 0.0_rt);
+    WarpX::AllocInitMultiFab(current_equilib[lev][1], amrex::convert(ba, jy_nodal_flag),
+        dm, ncomps, ngJ, lev, "current_equilib[y]", 0.0_rt);
+    WarpX::AllocInitMultiFab(current_equilib[lev][2], amrex::convert(ba, jz_nodal_flag),
+        dm, ncomps, ngJ, lev, "current_equilib[z]", 0.0_rt);
 
 #ifdef WARPX_DIM_RZ
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -265,7 +273,8 @@ void HybridPICModel::HybridPICSolveE (
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
-        Efield, current_fp_ampere[lev], Jfield, Bfield, rhofield,
+        Efield, current_fp_ampere[lev], Jfield, current_equilib[lev],
+        Bfield, rhofield,
         electron_pressure_fp[lev],
         edge_lengths, lev, this, include_resistivity_term
     );
@@ -327,5 +336,25 @@ void HybridPICModel::FillElectronPressureMF (
                 n0_ref, elec_temp, gamma, rho(i, j, k)
             );
         });
+    }
+}
+
+void HybridPICModel::CalculateEquilibCurrent (
+    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Bfield,
+    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths)
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        auto& warpx = WarpX::GetInstance();
+        warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
+            current_equilib[lev], Bfield[lev], edge_lengths[lev], lev
+        );
+
+        // we shouldn't apply the boundary condition to J since J = J_i - J_e but
+        // the boundary correction was already applied to J_i and the B-field
+        // boundary ensures that J itself complies with the boundary conditions, right?
+        warpx.ApplyJfieldBoundary(lev, current_equilib[lev][0].get(), current_equilib[lev][1].get(), current_equilib[lev][2].get(), PatchType::fine);
+        for (int i=0; i<3; i++) current_equilib[lev][i]->FillBoundary(warpx.Geom(lev).periodicity());
     }
 }

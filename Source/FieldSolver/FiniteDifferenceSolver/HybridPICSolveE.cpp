@@ -637,7 +637,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0)  - Jt_equilib(i, j, 0));
+                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0) - Jt_equilib(i, j, 0));
             },
 
             // Ez calculation
@@ -661,7 +661,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) -  - Jz_equilib(i, j, 0));
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_equilib(i, j, 0));
             }
         );
 
@@ -922,7 +922,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k)  - Jz_equilib(i, j, k));
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_equilib(i, j, k));
             }
         );
 

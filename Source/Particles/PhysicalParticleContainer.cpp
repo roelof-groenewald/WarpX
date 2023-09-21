@@ -2981,7 +2981,6 @@ void PhysicalParticleContainer::resample (const int timestep, const bool verbose
         }
     }
     WARPX_PROFILE_VAR_STOP(blp_resample_actual);
-
 }
 
 

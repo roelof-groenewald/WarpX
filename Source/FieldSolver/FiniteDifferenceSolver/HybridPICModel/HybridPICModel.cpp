@@ -346,7 +346,6 @@ void HybridPICModel::CalculateEquilibCurrent (
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
-        auto& warpx = WarpX::GetInstance();
         warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
             current_equilib[lev], Bfield[lev], edge_lengths[lev], lev
         );

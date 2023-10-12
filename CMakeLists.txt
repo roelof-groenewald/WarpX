@@ -1,7 +1,7 @@
 # Preamble ####################################################################
 #
 cmake_minimum_required(VERSION 3.20.0)
-project(WarpX VERSION 23.08)
+project(WarpX VERSION 23.10)
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
 
@@ -372,6 +372,7 @@ if(WarpX_PYTHON)
 endif()
 
 add_subdirectory(Source/ablastr)
+
 if(WarpX_LIB)
     add_subdirectory(Source/AcceleratorLattice)
     add_subdirectory(Source/BoundaryConditions)
@@ -380,6 +381,7 @@ if(WarpX_LIB)
     add_subdirectory(Source/Evolve)
     add_subdirectory(Source/FieldSolver)
     add_subdirectory(Source/Filter)
+    add_subdirectory(Source/Fluids)
     add_subdirectory(Source/Initialization)
     add_subdirectory(Source/Laser)
     add_subdirectory(Source/Parallelization)

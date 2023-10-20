@@ -85,7 +85,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        Real wt = static_cast<Real>(amrex::second());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Jr = Jfield[0]->array(mfi);
@@ -103,9 +103,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = m_stencil_coefs_r.size();
+        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        int const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract cylindrical specific parameters
         Real const dr = m_dr;
@@ -136,7 +136,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 
                 // Higher-order modes
                 // r on cell-centered point (Jr is cell-centered in r)
-                Real const r = rmin + (i + 0.5)*dr;
+                Real const r = rmin + (i + 0.5_rt)*dr;
                 for (int m=1; m<nmodes; m++) {
                     Jr(i, j, 0, 2*m-1) = one_over_mu0 * (
                         - T_Algo::DownwardDz(Bt, coefs_z, n_coefs_z, i, j, 0, 2*m-1)
@@ -227,7 +227,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
                     // For m==0, Bt is linear in r, for small r
                     // Therefore, the formula below regularizes the singularity
                     Jz(i, j, 0, 0) = one_over_mu0 * 4 * Bt(i, j, 0, 0) / dr;
-                    // Ensure that Ez remains 0 for higher-order modes
+                    // Ensure that Jz remains 0 for higher-order modes
                     for (int m=1; m<nmodes; m++) {
                         Jz(i, j, 0, 2*m-1) = 0.;
                         Jz(i, j, 0, 2*m  ) = 0.;
@@ -239,7 +239,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
@@ -276,7 +276,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        auto wt = static_cast<amrex::Real>(amrex::second());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Jx = Jfield[0]->array(mfi);
@@ -294,11 +294,11 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract tileboxes for which to loop
         Box const& tjx  = mfi.tilebox(Jfield[0]->ixType().toIntVect());
@@ -357,7 +357,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
@@ -433,6 +433,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // get hybrid model parameters
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
+    const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -477,7 +478,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        Real wt = static_cast<Real>(amrex::second());
 
         Array4<Real> const& enE_nodal = enE_nodal_mf.array(mfi);
         Array4<Real const> const& Jr = Jfield[0]->const_array(mfi);
@@ -526,7 +527,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
@@ -541,7 +542,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        Real wt = static_cast<Real>(amrex::second());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Er = Efield[0]->array(mfi);
@@ -557,6 +558,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jr_equilib = J_equilib[0]->const_array(mfi);
         Array4<Real const> const& Jt_equilib = J_equilib[1]->const_array(mfi);
         Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+        if (!use_dJ_for_resistive_term) {
+            amrex::ignore_unused(Jr_equilib, Jt_equilib, Jz_equilib);
+        }
 
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lr = edge_lengths[0]->array(mfi);
@@ -566,13 +570,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
-        int const n_coefs_r = m_stencil_coefs_r.size();
+        int const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        int const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         // Extract cylindrical specific parameters
         Real const dr = m_dr;
-        // int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
 
         Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
@@ -603,7 +606,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * (Jr(i, j, 0) - Jr_equilib(i, j, 0));
+                const auto Jr_eq = (use_dJ_for_resistive_term) ? Jr_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * (Jr(i, j, 0) - Jr_eq);
             },
 
             // Et calculation
@@ -637,7 +641,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0) - Jt_equilib(i, j, 0));
+                const auto Jt_eq = (use_dJ_for_resistive_term) ? Jt_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0) - Jt_eq);
             },
 
             // Ez calculation
@@ -661,14 +666,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_equilib(i, j, 0));
+                const auto Jz_eq = (use_dJ_for_resistive_term) ? Jz_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_eq);
             }
         );
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
@@ -701,6 +707,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // get hybrid model parameters
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
+    const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -745,7 +752,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        auto wt = static_cast<amrex::Real>(amrex::second());
 
         Array4<Real> const& enE_nodal = enE_nodal_mf.array(mfi);
         Array4<Real const> const& Jx = Jfield[0]->const_array(mfi);
@@ -794,7 +801,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
@@ -809,7 +816,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         {
             amrex::Gpu::synchronize();
         }
-        Real wt = amrex::second();
+        auto wt = static_cast<amrex::Real>(amrex::second());
 
         // Extract field data for this grid/tile
         Array4<Real> const& Ex = Efield[0]->array(mfi);
@@ -825,6 +832,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jx_equilib = J_equilib[0]->const_array(mfi);
         Array4<Real const> const& Jy_equilib = J_equilib[1]->const_array(mfi);
         Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+        if (!use_dJ_for_resistive_term) {
+            amrex::ignore_unused(Jx_equilib, Jy_equilib, Jz_equilib);
+        }
 
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
@@ -834,11 +844,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
-        int const n_coefs_x = m_stencil_coefs_x.size();
+        auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
         Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
-        int const n_coefs_y = m_stencil_coefs_y.size();
+        auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
-        int const n_coefs_z = m_stencil_coefs_z.size();
+        auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
         Box const& tex  = mfi.tilebox(Efield[0]->ixType().toIntVect());
         Box const& tey  = mfi.tilebox(Efield[1]->ixType().toIntVect());
@@ -868,7 +878,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * (Jx(i, j, k) - Jx_equilib(i, j, k));
+                const auto Jx_eq = (use_dJ_for_resistive_term) ? Jx_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * (Jx(i, j, k) - Jx_eq);
             },
 
             // Ey calculation
@@ -898,7 +909,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * (Jy(i, j, k) - Jy_equilib(i, j, k));
+                const auto Jy_eq = (use_dJ_for_resistive_term) ? Jy_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * (Jy(i, j, k) - Jy_eq);
             },
 
             // Ez calculation
@@ -922,14 +934,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_equilib(i, j, k));
+                const auto Jz_eq = (use_dJ_for_resistive_term) ? Jz_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_eq);
             }
         );
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }

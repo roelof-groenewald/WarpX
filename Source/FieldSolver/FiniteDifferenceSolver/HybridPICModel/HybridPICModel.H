@@ -137,6 +137,7 @@ public:
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<1> m_eta;
+    bool m_use_dJ_for_resistive_term = false;
 
     // Declare multifabs specifically needed for the hybrid-PIC model
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > rho_fp_temp;
@@ -182,7 +183,7 @@ struct ElectronPressure {
                                      amrex::Real const T0,
                                      amrex::Real const gamma,
                                      amrex::Real const rho) {
-        return n0 * T0 * pow((rho/PhysConst::q_e)/n0, gamma);
+        return n0 * T0 * std::pow((rho/PhysConst::q_e)/n0, gamma);
     }
 };
 

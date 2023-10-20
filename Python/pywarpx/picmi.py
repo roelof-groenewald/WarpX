@@ -1048,11 +1048,16 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     plasma_resistivity: float or str
         Value or expression to use for the plasma resistivity.
 
+    use_dJ_in_resistive_term: bool, optional
+        Whether to use the change in total current (from the first simulation
+        step) or the total current in the resistive term in Ohm's law.
+
     substeps: int, default=100
         Number of substeps to take when updating the B-field.
     """
     def __init__(self, grid, Te=None, n0=None, gamma=None,
-                 n_floor=None, plasma_resistivity=None, substeps=None, **kw):
+                 n_floor=None, plasma_resistivity=None,
+                 use_dJ_in_resistive_term=None, substeps=None, **kw):
         self.grid = grid
         self.method = "hybrid"
 
@@ -1061,6 +1066,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.gamma = gamma
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
+        self.use_dJ_in_resistive_term = use_dJ_in_resistive_term
 
         self.substeps = substeps
 
@@ -1079,6 +1085,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.__setattr__(
             'plasma_resistivity(rho)', self.plasma_resistivity
         )
+        pywarpx.hybridpicmodel.use_dJ_in_resistive_term = self.use_dJ_in_resistive_term
         pywarpx.hybridpicmodel.substeps = self.substeps
 
 

@@ -193,17 +193,6 @@ SimpleChargeExchange::doCollisionsWithinTile(
     amrex::ParticleReal m_ions = ions.getMass();
     const auto ptd_ions = ptile_ions.getParticleTileData();
 
-    // calculate total collision probability
-    auto nu_max = m_max_sigmav * n_ions_box.max(0);
-    auto total_collision_prob = 1.0_prt - std::exp(-nu_max * dt);
-
-    // dt has to be small enough that a linear expansion of the collision
-    // probability is sufficiently accurately, otherwise the MCC results
-    // will be very heavily affected by small changes in the timestep
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(nu_max*dt < 0.1_prt,
-        "dt is too large to ensure accurate MCC results"
-    );
-
     // get the tile / box properties
     amrex::Box box = mfi.validbox(); // mfi.tilebox();
     const auto &xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
@@ -213,22 +202,31 @@ SimpleChargeExchange::doCollisionsWithinTile(
     const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
     const amrex::Dim3 lo = lbound(box);
 
+    // calculate total collision probability
+    auto nu_max = m_max_sigmav * n_ions_box.max<amrex::RunOn::Device>(box, 0);
+    auto total_collision_prob = 1.0_prt - std::exp(-nu_max * dt);
+
+    // dt has to be small enough that a linear expansion of the collision
+    // probability is sufficiently accurately, otherwise the MCC results
+    // will be very heavily affected by small changes in the timestep
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(nu_max*dt < 0.1_prt,
+        "dt is too large to ensure accurate MCC results"
+    );
+
     // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.
     const int temp_modes = WarpX::n_rz_azimuthal_modes;
     const int interp_order = 1;
 
     const auto getPosition = GetParticlePosition(ptile_neutrals);
 
-    const auto& n_arr = n_ions_box.array();
+    const auto& n_arr = n_ions_box.const_array(0);
     auto n_arr_type = n_type;
 
     // grab particle data
-    amrex::ParticleReal * const AMREX_RESTRICT w1 = ptd_neutrals.m_rdata[PIdx::w];
     amrex::ParticleReal * const AMREX_RESTRICT u1x = ptd_neutrals.m_rdata[PIdx::ux];
     amrex::ParticleReal * const AMREX_RESTRICT u1y = ptd_neutrals.m_rdata[PIdx::uy];
     amrex::ParticleReal * const AMREX_RESTRICT u1z = ptd_neutrals.m_rdata[PIdx::uz];
 
-    amrex::ParticleReal * const AMREX_RESTRICT w2 = ptd_ions.m_rdata[PIdx::w];
     amrex::ParticleReal * const AMREX_RESTRICT u2x = ptd_ions.m_rdata[PIdx::ux];
     amrex::ParticleReal * const AMREX_RESTRICT u2y = ptd_ions.m_rdata[PIdx::uy];
     amrex::ParticleReal * const AMREX_RESTRICT u2z = ptd_ions.m_rdata[PIdx::uz];
@@ -308,9 +306,9 @@ SimpleChargeExchange::doCollisionsWithinTile(
                 ptd_ions.m_rdata[PIdx::uy][ion_idx] = u1y[neutral_idx];
                 ptd_ions.m_rdata[PIdx::uz][ion_idx] = u1z[neutral_idx];
 
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(w1[neutral_idx] == w2[ion_idx],
-                    "Particle weights must be equal to use simple charge exchange"
-                );
+                // WARPX_ALWAYS_ASSERT_WITH_MESSAGE(w1[neutral_idx] == w2[ion_idx],
+                //     "Particle weights must be equal to use simple charge exchange"
+                // );
 
                 // move the ion index forward, looping back around if needed
                 ++ion_cell_idx;

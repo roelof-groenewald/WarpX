@@ -210,7 +210,8 @@ SimpleChargeExchange::doCollisionsWithinTile(
     // probability is sufficiently accurately, otherwise the MCC results
     // will be very heavily affected by small changes in the timestep
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(nu_max*dt < 0.1_prt,
-        "dt is too large to ensure accurate MCC results"
+        "nu_max*dt = "+std::to_string(nu_max*dt)+
+        ": dt is too large to ensure accurate MCC results"
     );
 
     // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.

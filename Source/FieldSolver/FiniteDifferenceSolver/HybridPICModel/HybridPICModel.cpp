@@ -629,5 +629,58 @@ void HybridPICModel::BfieldEvolveRK (
         );
     }
 
-    // TODO INSERT STEPS 3 & 4
+    // Step 3:
+    // Calculate J = curl x B / mu0
+    CalculateCurrentAmpere(Bfield, edge_lengths);
+    // Calculate the E-field form Ohm's law
+    HybridPicSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
+    warpx.FillBoundaryE(ng, nodal_sync);
+    // Push forward the B-field using Faraday's law.
+    warpx.EvolveB(dt, dt_type);
+    warpx.FillBoundaryB(ng, nodal_sync);
+
+    // The Bfield is now given by:
+    // B_new = B_old + 0.5 * dt * K1
+    //         + dt * [-curl  x E(B_old + 0.5 * dt * K1)]
+    //       = B_old + 0.5 * dt * K1 + dt * K2
+    for (int ii = 0; ii < 3; ii++)
+    {
+        // Subtract 0.5 * dt * K1 from the Bfield for each direction to get 
+        // B_new = B_old + dt * K2.
+        MultiFab::Subtract(*Bfield[0][ii], K[ii], 1, 0, 1, ng);
+    }
+
+    // Step 4:
+    // Calculate J = curl x B / mu0
+    CalculateCurrentAmpere(Bfield, edge_lengths);
+    // Calculate the E-field form Ohm's law
+    HybridPicSolveE(Efield, Jfield, Bfield, rhofield, edge_lengths, true);
+    warpx.FillBoundaryE(ng, nodal_sync);
+    // Push forward the B-field using Faraday's law.
+    warpx.EvolveB(0.5_rt*dt, dt_type);
+    warpx.FillBoundaryB(ng, nodal_sync);
+
+    // The Bfield is now given by:
+    // B_new = B_old + dt * K2 + 0.5 * dt * [-curl x E(B_old + dt * K2)]
+    //       = B_old + dt * K2 + 0.5 * dt * K3
+    for (int ii = 0; ii < 3; ii++)
+    {
+        // Subtract B_old from the Bfield for each direction, to get 
+        // B = dt * K2 + 0.5 * dt * K3.
+        MultiFab::Subtract(*Bfield[0][ii], B_old[ii], 0, 0, 1, ng);
+        
+        // Add dt * K2 + 0.5 * dt * K3 to index 0 of K (= 0.5 * dt * K0).
+        MultiFab::Add(K[ii], *Bfield[0][ii], 0, 0, 1, ng);
+
+        // Add 2 * 0.5 * dt * K1 to index 0 of K.
+        MultiFab::LinComb(
+            K[ii], 1.0, K[ii], 0, 2.0, K[ii], 1, 0, 1, ng;
+        );
+
+        // Overwrite the Bfield with the Runge-Kutta sum:
+        // B_new = B_old + 1/3 * dt * (0.5 * K0 + K1 + K2 + 0.5 * K3).
+        MultiFab::LinComb(
+            *Bfield[0][ii], 1.0, B_old[ii], 0, 1.0/3.0, K[ii], 0, 0, 1, ng
+        );
+    }
 }

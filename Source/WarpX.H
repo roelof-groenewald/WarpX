@@ -520,8 +520,8 @@ public:
     const amrex::MultiFab& getedgelengths (int lev, int direction) {return *m_edge_lengths[lev][direction];}
     const amrex::MultiFab& getfaceareas  (int lev, int direction) {return *m_face_areas[lev][direction];}
 
-    bool DoPML () const {return do_pml;}
-    bool DoFluidSpecies () const {return do_fluid_species;}
+    [[nodiscard]] bool DoPML () const {return do_pml;}
+    [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
 
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_PSATD)
     const PML_RZ* getPMLRZ() {return pml_rz[0].get();}

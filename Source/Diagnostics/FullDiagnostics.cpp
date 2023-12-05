@@ -41,16 +41,14 @@
 
 using namespace amrex::literals;
 
-FullDiagnostics::FullDiagnostics (int i, std::string name)
-    : Diagnostics(i, name)
+FullDiagnostics::FullDiagnostics (int i, std::string name):
+    Diagnostics{i, name},
+    m_solver_deposits_current{
+        !(WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
+        WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic)}
 {
     ReadParameters();
     BackwardCompatibility();
-
-    m_solver_deposits_current = !(
-        WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
-        WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic
-    );
 }
 
 void
@@ -128,7 +126,7 @@ FullDiagnostics::BackwardCompatibility ()
 }
 
 void
-FullDiagnostics::Flush ( int i_buffer )
+FullDiagnostics::Flush ( int i_buffer, bool /* force_flush */ )
 {
     // This function should be moved to Diagnostics when plotfiles/openpmd format
     // is supported for BackTransformed Diagnostics, in BTDiagnostics class.
@@ -629,7 +627,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     m_all_field_functors[lev].resize(ntot);
     // Fill vector of functors for all components except individual cylindrical modes.
     for (int comp=0; comp<nvar; comp++){
-         if       ( m_varnames[comp] == "Ez" ){
+        if        ( m_varnames[comp] == "Ez" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.get_pointer_Efield_aux(lev, 2), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "Bz" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.get_pointer_Bfield_aux(lev, 2), lev, m_crse_ratio);

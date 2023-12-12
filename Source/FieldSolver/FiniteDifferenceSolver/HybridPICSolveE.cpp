@@ -28,8 +28,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
     int lev )
 {
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
         CalculateCurrentAmpereCylindrical <CylindricalYeeAlgorithm> (
@@ -369,6 +369,8 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -376,20 +378,20 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     int lev, HybridPICModel const* hybrid_model,
     const bool include_resistivity_term )
 {
-   // Select algorithm (The choice of algorithm is a runtime option,
-   // but we compile code for each algorithm, using templates)
+    // Select algorithm (The choice of algorithm is a runtime option,
+    // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Jextfield, J_equilib, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Jextfield, J_equilib, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
@@ -406,6 +408,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -431,6 +435,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // get hybrid model parameters
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
+    const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -484,6 +489,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& Jir = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jit = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
+        Array4<Real const> const& Jextr = Jextfield[0]->const_array(mfi);
+        Array4<Real const> const& Jextt = Jextfield[1]->const_array(mfi);
+        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Br = Bfield[0]->const_array(mfi);
         Array4<Real const> const& Bt = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
@@ -508,16 +516,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, 0, 0) = (
-                (jt_interp - jit_interp) * Bz_interp
-                - (jz_interp - jiz_interp) * Bt_interp
+                (jt_interp - jit_interp - Jextt(i, j, 0)) * Bz_interp
+                - (jz_interp - jiz_interp - Jextz(i, j, 0)) * Bt_interp
             );
             enE_nodal(i, j, 0, 1) = (
-                (jz_interp - jiz_interp) * Br_interp
-                - (jr_interp - jir_interp) * Bz_interp
+                (jz_interp - jiz_interp - Jextz(i, j, 0)) * Br_interp
+                - (jr_interp - jir_interp - Jextr(i, j, 0)) * Bz_interp
             );
             enE_nodal(i, j, 0, 2) = (
-                (jr_interp - jir_interp) * Bt_interp
-                - (jt_interp - jit_interp) * Br_interp
+                (jr_interp - jir_interp - Jextr(i, j, 0)) * Bt_interp
+                - (jt_interp - jit_interp - Jextt(i, j, 0)) * Br_interp
             );
         });
 
@@ -551,6 +559,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
+
+        Array4<Real const> const& Jr_equilib = J_equilib[0]->const_array(mfi);
+        Array4<Real const> const& Jt_equilib = J_equilib[1]->const_array(mfi);
+        Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+        if (!use_dJ_for_resistive_term) {
+            amrex::ignore_unused(Jr_equilib, Jt_equilib, Jz_equilib);
+        }
 
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lr = edge_lengths[0]->array(mfi);
@@ -596,7 +611,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * Jr(i, j, 0);
+                const auto Jr_eq = (use_dJ_for_resistive_term) ? Jr_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Er(i, j, 0) += eta(rho_val) * (Jr(i, j, 0) - Jr_eq);
             },
 
             // Et calculation
@@ -630,7 +646,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * Jt(i, j, 0);
+                const auto Jt_eq = (use_dJ_for_resistive_term) ? Jt_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Et(i, j, 0) += eta(rho_val) * (Jt(i, j, 0) - Jt_eq);
             },
 
             // Ez calculation
@@ -654,7 +671,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * Jz(i, j, k);
+                const auto Jz_eq = (use_dJ_for_resistive_term) ? Jz_equilib(i, j, 0) : 0.0_rt;
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_eq);
             }
         );
 
@@ -674,6 +692,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Efield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_equilib,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -693,6 +713,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // get hybrid model parameters
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
+    const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -746,6 +767,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& Jix = Jifield[0]->const_array(mfi);
         Array4<Real const> const& Jiy = Jifield[1]->const_array(mfi);
         Array4<Real const> const& Jiz = Jifield[2]->const_array(mfi);
+        Array4<Real const> const& Jextx = Jextfield[0]->const_array(mfi);
+        Array4<Real const> const& Jexty = Jextfield[1]->const_array(mfi);
+        Array4<Real const> const& Jextz = Jextfield[2]->const_array(mfi);
         Array4<Real const> const& Bx = Bfield[0]->const_array(mfi);
         Array4<Real const> const& By = Bfield[1]->const_array(mfi);
         Array4<Real const> const& Bz = Bfield[2]->const_array(mfi);
@@ -770,16 +794,16 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // calculate enE = (J - Ji) x B
             enE_nodal(i, j, k, 0) = (
-                (jy_interp - jiy_interp) * Bz_interp
-                - (jz_interp - jiz_interp) * By_interp
+                (jy_interp - jiy_interp - Jexty(i, j, k)) * Bz_interp
+                - (jz_interp - jiz_interp - Jextz(i, j, k)) * By_interp
             );
             enE_nodal(i, j, k, 1) = (
-                (jz_interp - jiz_interp) * Bx_interp
-                - (jx_interp - jix_interp) * Bz_interp
+                (jz_interp - jiz_interp - Jextz(i, j, k)) * Bx_interp
+                - (jx_interp - jix_interp - Jextx(i, j, k)) * Bz_interp
             );
             enE_nodal(i, j, k, 2) = (
-                (jx_interp - jix_interp) * By_interp
-                - (jy_interp - jiy_interp) * Bx_interp
+                (jx_interp - jix_interp - Jextx(i, j, k)) * By_interp
+                - (jy_interp - jiy_interp - Jexty(i, j, k)) * Bx_interp
             );
         });
 
@@ -813,6 +837,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
+
+        Array4<Real const> const& Jx_equilib = J_equilib[0]->const_array(mfi);
+        Array4<Real const> const& Jy_equilib = J_equilib[1]->const_array(mfi);
+        Array4<Real const> const& Jz_equilib = J_equilib[2]->const_array(mfi);
+        if (!use_dJ_for_resistive_term) {
+            amrex::ignore_unused(Jx_equilib, Jy_equilib, Jz_equilib);
+        }
 
 #ifdef AMREX_USE_EB
         amrex::Array4<amrex::Real> const& lx = edge_lengths[0]->array(mfi);
@@ -856,7 +887,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * Jx(i, j, k);
+                const auto Jx_eq = (use_dJ_for_resistive_term) ? Jx_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ex(i, j, k) += eta(rho_val) * (Jx(i, j, k) - Jx_eq);
             },
 
             // Ey calculation
@@ -886,7 +918,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * Jy(i, j, k);
+                const auto Jy_eq = (use_dJ_for_resistive_term) ? Jy_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ey(i, j, k) += eta(rho_val) * (Jy(i, j, k) - Jy_eq);
             },
 
             // Ez calculation
@@ -910,7 +943,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * Jz(i, j, k);
+                const auto Jz_eq = (use_dJ_for_resistive_term) ? Jz_equilib(i, j, k) : 0.0_rt;
+                if (include_resistivity_term) Ez(i, j, k) += eta(rho_val) * (Jz(i, j, k) - Jz_eq);
             }
         );
 

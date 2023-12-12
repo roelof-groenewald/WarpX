@@ -23,6 +23,18 @@
 
 
 /**
+  * \brief struct to determine the algorithm used to handle low density / vacuum
+           regions, default is DensityFloor.
+  */
+struct VacuumAlgo {
+    enum {
+        DensityFloor = 0,
+        Holstrom = 1
+    };
+};
+
+
+/**
  * \brief This class contains the parameters needed to evaluate hybrid field
  * solutions (kinetic ions with fluid electrons).
  */
@@ -179,6 +191,15 @@ public:
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<1> m_eta;
     bool m_use_dJ_for_resistive_term = false;
+
+    /** Different approaches to handling low plasma density regions */
+    std::map<std::string, int> vacuum_algorithm_to_int = {
+        {"density_floor", VacuumAlgo::DensityFloor},
+        {"holstrom", VacuumAlgo::Holstrom},
+        {"default", VacuumAlgo::DensityFloor},
+    };
+    std::string m_vacuum_algorithm_str = "default";
+    int m_vacuum_algorithm;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";

@@ -436,6 +436,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
+    const auto vacuum_algorithm = hybrid_model->m_vacuum_algorithm;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -596,17 +597,23 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Skip if this cell is fully covered by embedded boundaries
                 if (lr(i, j, 0) <= 0) return;
 #endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
-
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_r = Interp(enE, nodal, Er_stag, coarsen, i, j, 0, 0);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_r = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Er(i, j, 0) = (enE_r - grad_Pe) / rho_val;
 
@@ -630,18 +637,24 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     return;
                 }
 
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
-
                 // Get the gradient of the electron pressure
                 // -> d/dt = 0 for m = 0
                 auto grad_Pe = 0.0_rt;
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_t = Interp(enE, nodal, Et_stag, coarsen, i, j, 0, 1);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Et_stag, coarsen, i, j, 0, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_t = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Et(i, j, 0) = (enE_t - grad_Pe) / rho_val;
 
@@ -656,17 +669,23 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Skip field solve if this cell is fully covered by embedded boundaries
                 if (lz(i,j,0) <= 0) return;
 #endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
-
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k, 0);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_z = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
@@ -714,6 +733,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto eta = hybrid_model->m_eta;
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto use_dJ_for_resistive_term = hybrid_model->m_use_dJ_for_resistive_term;
+    const auto vacuum_algorithm = hybrid_model->m_vacuum_algorithm;
 
     // Index type required for interpolating fields from their respective
     // staggering to the Ex, Ey, Ez locations
@@ -872,17 +892,23 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Skip if this cell is fully covered by embedded boundaries
                 if (lx(i, j, k) <= 0) return;
 #endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
-
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_x = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
@@ -903,17 +929,23 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 if (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0) return;
 #endif
 #endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
-
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_y = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
@@ -928,17 +960,24 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Skip field solve if this cell is fully covered by embedded boundaries
                 if (lz(i,j,k) <= 0) return;
 #endif
-                // Interpolate to get the appropriate charge density in space
-                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
-
-                // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) rho_val = rho_floor;
 
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
 
                 // interpolate the nodal neE values to the Yee grid
                 auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
+
+                // Interpolate to get the appropriate charge density in space
+                Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+
+                // safety condition since we divide by rho_val later
+                if (rho_val < rho_floor) {
+                    rho_val = rho_floor;
+                    if (vacuum_algorithm == VacuumAlgo::Holstrom) {
+                        enE_z = 0.0_rt;
+                        grad_Pe = 0.0_rt;
+                    }
+                }
 
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 

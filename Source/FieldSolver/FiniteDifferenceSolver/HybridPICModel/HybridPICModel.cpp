@@ -45,6 +45,14 @@ void HybridPICModel::ReadParameters ()
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
 
+    pp_hybrid.query("vacuum_algorithm", m_vacuum_algorithm_str);
+    // Convert to lower case
+    std::transform(
+        m_vacuum_algorithm_str.begin(), m_vacuum_algorithm_str.end(),
+        m_vacuum_algorithm_str.begin(), ::tolower
+    );
+    m_vacuum_algorithm = vacuum_algorithm_to_int[m_vacuum_algorithm_str];
+
     // external currents
     pp_hybrid.query("Jx_external_grid_function(x,y,z,t)", m_Jx_ext_grid_function);
     pp_hybrid.query("Jy_external_grid_function(x,y,z,t)", m_Jy_ext_grid_function);

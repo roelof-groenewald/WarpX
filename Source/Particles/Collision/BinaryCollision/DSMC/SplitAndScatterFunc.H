@@ -15,7 +15,7 @@
  * \brief Function that performs the particle scattering and injection due
  * to binary collisions.
  *
- * \return num_added the number of particles that were written to dst.
+ * \return num_added the number of particles added to each species.
  */
 template <typename index_type, typename Tile, typename Index, typename CopyFunc,
           amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
@@ -31,21 +31,22 @@ int splitScatteringParticles (
 {
     using namespace amrex;
 
-    if (n_total_pairs == 0) return 0;
+    if (n_total_pairs == 0) {
+        return 0;
+    }
 
     Gpu::DeviceVector<Index> offsets(n_total_pairs);
     Index* AMREX_RESTRICT p_offsets = offsets.dataPtr();
-    Index offset = 0;
-    // the following is used to calculate the appropriate offset instead
-    // of a cummulative sum since the mask is also used to specify the type
-    // of collision and can therefore have values >1
-    for (Index i=0; i<n_total_pairs; i++)
-    {
-        p_offsets[i] = offset;
-        if (mask[i]) offset++;
-    }
 
-    const Index num_added = offset;
+    // The following is used to calculate the appropriate offsets. Note that
+    // a standard cummulative sum is not appropriate since the mask is also
+    // used to specify the type of collision and can therefore have values >1
+    auto const num_added = amrex::Scan::PrefixSum<Index>(n_total_pairs,
+        [=] AMREX_GPU_DEVICE (Index i) -> Index { return mask[i] ? 1 : 0; },
+        [=] AMREX_GPU_DEVICE (Index i, Index s) { p_offsets[i] = s; },
+        amrex::Scan::Type::exclusive, amrex::Scan::retSum
+    );
+
     const auto ptile1_index = ptile1.numParticles();
     const auto ptile2_index = ptile2.numParticles();
     ptile1.resize(ptile1_index + num_added);
@@ -114,7 +115,7 @@ int splitScatteringParticles (
             if (mask[i] == int(ScatteringProcessType::ELASTIC)) {
                 // randomly rotate the velocity vector for the first particle
                 ParticleUtils::RandomizeVelocity(
-                    ux1, uy1, uz1, sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1), engine
+                    ux1, uy1, uz1, std::sqrt(ux1*ux1 + uy1*uy1 + uz1*uz1), engine
                 );
                 // set the second particles velocity so that the total momentum
                 // is zero

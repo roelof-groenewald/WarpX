@@ -27,7 +27,7 @@
 
 
 /**
- * \brief This class perfoms DSMC (direct simulation Monte Carlo) collisions
+ * \brief This class performs DSMC (direct simulation Monte Carlo) collisions
  * within a cell. Particles are paired up and for each pair a stochastic process
  * determines whether a collision occurs. The algorithm is similar to the one
  * used for binary Coulomb collisions and the nuclear fusion module.
@@ -43,13 +43,9 @@ class DSMC final
     using index_type = ParticleBins::index_type;
 
 public:
-    /**
-     * \brief Default constructor of the DSMCFunc class.
-     */
-    virtual ~DSMC () = default;
 
     /**
-     * \brief Constructor of the DSMCFunc class
+     * \brief Constructor of the DSMC class
      *
      * @param[in] collision_name the name of the collision
      */

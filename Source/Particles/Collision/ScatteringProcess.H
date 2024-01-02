@@ -40,6 +40,8 @@ public:
                 amrex::ParticleReal energy
                 );
 
+    ~ScatteringProcess() = default;
+
     ScatteringProcess (ScatteringProcess const&)            = delete;
     ScatteringProcess& operator= (ScatteringProcess const&) = delete;
     ScatteringProcess (ScatteringProcess &&)                = default;

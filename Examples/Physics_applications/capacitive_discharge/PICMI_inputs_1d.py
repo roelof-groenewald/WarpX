@@ -338,6 +338,7 @@ class CapacitiveDischargeExample(object):
                     n_macroparticle_per_cell=[self.seed_nppc//2], grid=self.grid
                 )
             )
+        self.solver.sim_ext = self.sim.extension
 
         if self.dsmc:
             # Periodically reset neutral density to starting temperature

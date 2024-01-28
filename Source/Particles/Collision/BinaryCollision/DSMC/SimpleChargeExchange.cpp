@@ -232,7 +232,7 @@ SimpleChargeExchange::doCollisionsWithinTile(
     amrex::ParticleReal * const AMREX_RESTRICT u2y = ptd_ions.m_rdata[PIdx::uy];
     amrex::ParticleReal * const AMREX_RESTRICT u2z = ptd_ions.m_rdata[PIdx::uz];
 
-    const amrex::Long minus_one_long = -1;
+    // const amrex::Long minus_one_long = -1;
 
     // loop over cells
     amrex::ParallelForRNG( n_cells,

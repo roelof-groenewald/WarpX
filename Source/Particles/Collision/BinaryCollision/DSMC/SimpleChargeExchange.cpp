@@ -149,7 +149,7 @@ SimpleChargeExchange::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mu
         }
 
         // Call redistribute to remove particles with negative ids
-        neutrals.Redistribute(lev, lev, 0, true, true);
+        // neutrals.Redistribute(lev, lev, 0, true, true);
     }
 }
 
@@ -298,14 +298,22 @@ SimpleChargeExchange::doCollisionsWithinTile(
                 // determine if these particles should collide
                 if (amrex::Random(engine) > nu_i) continue;
 
-                // set neutral id to -1 so that it will be removed
-                auto& neutral = ptd_neutrals.m_aos[neutral_idx];
-                neutral.atomicSetID(minus_one_long);
+                // save old ion velocity to set the neutral velocity to it later
+                auto ux_ion_old = u2x[ion_idx];
+                auto uy_ion_old = u2y[ion_idx];
+                auto uz_ion_old = u2z[ion_idx];
 
                 // set ion velocity to neutral velocity
                 ptd_ions.m_rdata[PIdx::ux][ion_idx] = u1x[neutral_idx];
                 ptd_ions.m_rdata[PIdx::uy][ion_idx] = u1y[neutral_idx];
                 ptd_ions.m_rdata[PIdx::uz][ion_idx] = u1z[neutral_idx];
+
+                // set neutral neutral velocity to ion velocity
+                // auto& neutral = ptd_neutrals.m_aos[neutral_idx];
+                // neutral.atomicSetID(minus_one_long);
+                ptd_neutrals.m_rdata[PIdx::ux][neutral_idx] = ux_ion_old;
+                ptd_neutrals.m_rdata[PIdx::uy][neutral_idx] = uy_ion_old;
+                ptd_neutrals.m_rdata[PIdx::uz][neutral_idx] = uz_ion_old;
 
                 // WARPX_ALWAYS_ASSERT_WITH_MESSAGE(w1[neutral_idx] == w2[ion_idx],
                 //     "Particle weights must be equal to use simple charge exchange"

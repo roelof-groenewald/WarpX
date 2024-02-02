@@ -35,7 +35,7 @@ struct PIdx
 #ifdef WARPX_DIM_RZ
         theta,      ///< RZ needs all three position components
 #endif
-        nattribs    ///< number of attributes
+        nattribs    ///< number of compile-time attributes
     };
 };
 
@@ -44,14 +44,13 @@ struct PIdx
 struct PIdxInt
 {
     enum {
-        nattribs    ///< number of attributes
+        nattribs    ///< number of compile-time attributes
     };
 };
 
 /** Particle Container class that allows to add/access particle components
  *  with a name (string) instead of doing so with an integer index.
- *  (The "components" are all the particle quantities - except those
- *  that are stored in an AoS by amrex, i.e. the particle positions and ID)
+ *  (The "components" are all the particle amrex::Real quantities.)
  *
  *  This is done by storing maps that give the index of the component
  *  that corresponds to a given string.

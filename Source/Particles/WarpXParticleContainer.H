@@ -90,12 +90,13 @@ public:
  * classes can be used for plasma particles, photon particles, or non-physical
  * particles (e.g., for the laser antenna).
  * It derives from amrex::ParticleContainerPureSoA<PIdx::nattribs>, where the
- * template arguments stand for the number of int and amrex::Real SoA and AoS
- * data in amrex::Particle.
- *  - AoS amrex::Real: x, y, z (default), 0 additional (first template
- *    parameter)
- *  - AoS int: id, cpu (default), 0 additional (second template parameter)
- *  - SoA amrex::Real: PIdx::nattribs (third template parameter), see PIdx for
+ * template arguments stand for the number of int and amrex::Real SoA
+ * data in amrex::SoAParticle.
+ *  - SoA amrex::Real: positions x, y, z, momentum ux, uy, uz, ... see PIdx for details;
+ *                     more can be added at runtime
+ *  - SoA int: 0 attributes by default, but can be added at runtime
+ *  - SoA uint64_t: idcpu, a global 64bit index, with a 40bit local id and a 24bit cpu id
+ *    (both set at creation)
  * the list.
  *
  * WarpXParticleContainer contains the main functions for initialization,

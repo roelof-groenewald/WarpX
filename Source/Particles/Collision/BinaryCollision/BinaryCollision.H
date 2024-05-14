@@ -429,7 +429,7 @@ public:
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
-                                                    ptile_1, ptile_1,
+                                                    soa_1, soa_1, // ptile_1, ptile_1,
                                                     product_species_vector,
                                                     tile_products_data,
                                                     m1, m1,
@@ -646,7 +646,7 @@ public:
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
-                                                    ptile_1, ptile_2,
+                                                    soa_1, soa_2, // ptile_1, ptile_2,
                                                     product_species_vector,
                                                     tile_products_data,
                                                     m1, m2,

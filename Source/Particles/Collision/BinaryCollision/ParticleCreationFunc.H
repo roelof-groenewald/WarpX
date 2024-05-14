@@ -93,7 +93,8 @@ public:
     AMREX_INLINE
     amrex::Vector<int> operator() (
                     const index_type& n_total_pairs,
-                    ParticleTileType& ptile1, ParticleTileType& ptile2,
+                    const SoaData_type& soa_1, const SoaData_type& soa_2,
+                    // ParticleTileType& ptile1, ParticleTileType& ptile2,
                     const amrex::Vector<WarpXParticleContainer*>& pc_products,
                     ParticleTileType** AMREX_RESTRICT tile_products,
                     const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
@@ -128,8 +129,8 @@ public:
             tile_products[i]->resize(products_np[i] + num_added);
         }
 
-        const auto soa_1 = ptile1.getParticleTileData();
-        const auto soa_2 = ptile2.getParticleTileData();
+        // const auto soa_1 = ptile1.getParticleTileData();
+        // const auto soa_2 = ptile2.getParticleTileData();
 
         amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
         amrex::ParticleReal* AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
@@ -298,7 +299,8 @@ public:
     AMREX_INLINE
     amrex::Vector<int> operator() (
                     const index_type& /*n_total_pairs*/,
-                    ParticleTileType& /*ptile1*/, ParticleTileType& /*ptile2*/,
+                    const SoaData_type& /*soa_1*/, const SoaData_type& /*soa_2*/,
+                    // ParticleTileType& /*ptile1*/, ParticleTileType& /*ptile2*/,
                     amrex::Vector<WarpXParticleContainer*>& /*pc_products*/,
                     ParticleTileType** /*tile_products*/,
                     const amrex::ParticleReal& /*m1*/, const amrex::ParticleReal& /*m2*/,

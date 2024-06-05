@@ -12,15 +12,17 @@
 
 #include "HybridPICModel_fwd.H"
 
+#include "Utils/WarpXAlgorithmSelection.H"
+
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXProfilerWrapper.H"
-#include "WarpX.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
 
+#include <optional>
 
 /**
  * \brief This class contains the parameters needed to evaluate hybrid field
@@ -79,7 +81,7 @@ public:
         int lev
     );
 
-    void CalculateEquilibCurrent (
+    void CalculateInitialCurrent (
         amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Bfield,
         amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths
     );
@@ -153,12 +155,12 @@ public:
      * charge density (and assumption of quasi-neutrality) using the user
      * specified electron equation of state.
      *
-     * \param[out] Pe   scalar electron pressure MultiFab at a given level
-     * \param[in] rhofield scalar ion charge density Multifab at a given level
+     * \param[out] Pe_filed scalar electron pressure MultiFab at a given level
+     * \param[in] rho_field scalar ion charge density Multifab at a given level
      */
     void FillElectronPressureMF (
-        std::unique_ptr<amrex::MultiFab> const& Pe,
-        amrex::MultiFab* const& rhofield );
+        std::unique_ptr<amrex::MultiFab> const& Pe_field,
+        amrex::MultiFab* const& rho_field ) const;
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B */
@@ -175,10 +177,14 @@ public:
     amrex::Real m_n_floor = 1.0;
 
     /** Plasma resistivity */
+    bool m_use_dJ_for_resistive_term = false;
     std::string m_eta_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
-    amrex::ParserExecutor<1> m_eta;
-    bool m_use_dJ_for_resistive_term = false;
+    amrex::ParserExecutor<2> m_eta;
+    bool m_resistivity_has_J_dependence = false;
+
+    /** Plasma hyper-resisitivity */
+    amrex::Real m_eta_h = 0.0;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
@@ -194,13 +200,19 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_ampere;
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_external;
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > electron_pressure_fp;
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_equilib;
+    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_init;
 
     // Helper functions to retrieve hybrid-PIC multifabs
     [[nodiscard]] amrex::MultiFab*
     get_pointer_current_fp_ampere  (int lev, int direction) const
     {
         return current_fp_ampere[lev][direction].get();
+    }
+
+    [[nodiscard]] amrex::MultiFab*
+    get_pointer_current_fp_external (int lev, int direction) const
+    {
+        return current_fp_external[lev][direction].get();
     }
 
     [[nodiscard]] amrex::MultiFab*

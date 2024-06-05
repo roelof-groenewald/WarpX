@@ -18,8 +18,8 @@ has to resolve the electron Debye length and CFL-condition based on the speed
 of light.
 
 Many authors have described variations of the kinetic ion & fluid electron model,
-generally referred to as particle-fluid hybrid or just hybrid-PIC models. The implementation
-in WarpX follows the outline from :cite:t:`c-winske2022hybrid`.
+generally referred to as particle-fluid hybrid or just hybrid-PIC models. The
+implementation in WarpX is described in detail in :cite:t:`kfhm-Groenewald2023`.
 This description follows mostly from that reference.
 
 Model
@@ -29,7 +29,7 @@ The basic justification for the hybrid model is that the system to which it is
 applied is dominated by ion kinetics, with ions moving much slower than electrons
 and photons. In this scenario two critical approximations can be made, namely,
 neutrality (:math:`n_e=n_i`) and the Maxwell-Ampere equation can be simplified by
-neglecting the displacement current term :cite:p:`c-NIELSON1976`, giving,
+neglecting the displacement current term :cite:p:`kfhm-Nielson1976`, giving,
 
     .. math::
 
@@ -73,13 +73,13 @@ If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above
         en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
 
 Making the further simplifying assumptions that the electron pressure is isotropic and that
-the electron drag term can be written as a simple resistance
-i.e. :math:`\vec{R}_e = en_e\vec{\eta}\cdot\vec{J}`, brings us to the implemented form of
+the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
+i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
 Ohm's law:
 
     .. math::
 
-        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\vec{\eta}\cdot\vec{J}.
+        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
 
 Lastly, if an electron temperature is given from which the electron pressure can
 be calculated, the model is fully constrained and can be evolved given initial
@@ -167,5 +167,13 @@ input parameters, :math:`T_{e0}`, :math:`n_0` and :math:`\gamma` using
 The isothermal limit is given by :math:`\gamma = 1` while :math:`\gamma = 5/3`
 (default) produces the adiabatic limit.
 
+Electron current
+^^^^^^^^^^^^^^^^
+
+WarpX's displacement current diagnostic can be used to output the electron current in
+the kinetic-fluid hybrid model since in the absence of kinetic electrons, and under
+the assumption of zero displacement current, that diagnostic simply calculates the
+hybrid model's electron current.
+
 .. bibliography::
-    :keyprefix: c-
+    :keyprefix: kfhm-

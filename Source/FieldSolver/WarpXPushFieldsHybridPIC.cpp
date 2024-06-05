@@ -47,12 +47,14 @@ void WarpX::HybridPICEvolveFields ()
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to
     // a nodal grid
-    for (int lev = 0; lev <= finest_level; ++lev)
-        for (int idim = 0; idim < 3; ++idim)
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
             current_fp[lev][idim]->FillBoundary(Geom(lev).periodicity());
+        }
+    }
 
     // Get requested number of substeps to use
-    int sub_steps = m_hybrid_pic_model->m_substeps;
+    const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal(m_edge_lengths);
@@ -152,8 +154,7 @@ void WarpX::HybridPICEvolveFields ()
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculateCurrentAmpere(Bfield_fp, m_edge_lengths);
     m_hybrid_pic_model->HybridPICSolveE(
-        Efield_fp, current_fp_temp, Bfield_fp, rho_fp, m_edge_lengths,
-        false
+        Efield_fp, current_fp_temp, Bfield_fp, rho_fp, m_edge_lengths, false
     );
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
@@ -198,5 +199,5 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
         );
     }
     if (m_hybrid_pic_model->m_use_dJ_for_resistive_term)
-        m_hybrid_pic_model->CalculateEquilibCurrent(Bfield_fp, m_edge_lengths);
+        m_hybrid_pic_model->CalculateInitialCurrent(Bfield_fp, m_edge_lengths);
 }

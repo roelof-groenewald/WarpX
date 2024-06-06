@@ -568,7 +568,7 @@ void HybridPICModel::CalculateInitialCurrent (
 
         // we shouldn't apply the boundary condition to J since J = J_i - J_e but
         // the boundary correction was already applied to J_i and the B-field
-        // boundary ensures that J itself complies with the boundary conditions, right?
+        // boundary ensures that J itself complies with the boundary conditions.
         warpx.ApplyJfieldBoundary(lev, current_init[lev][0].get(), current_init[lev][1].get(), current_init[lev][2].get(), PatchType::fine);
         for (int i=0; i<3; i++) current_init[lev][i]->FillBoundary(warpx.Geom(lev).periodicity());
     }

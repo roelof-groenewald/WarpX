@@ -370,7 +370,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_init,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jinit,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -384,14 +384,14 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 #ifdef WARPX_DIM_RZ
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, J_init, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Jextfield, Jinit, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
 #else
 
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Jextfield, J_init, Bfield, rhofield, Pefield,
+            Efield, Jfield, Jifield, Jextfield, Jinit, Bfield, rhofield, Pefield,
             edge_lengths, lev, hybrid_model, include_resistivity_term
         );
 
@@ -409,7 +409,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_init,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jinit,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -564,9 +564,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
 
-        Array4<Real const> const& Jr_init = J_init[0]->const_array(mfi);
-        Array4<Real const> const& Jt_init = J_init[1]->const_array(mfi);
-        Array4<Real const> const& Jz_init = J_init[2]->const_array(mfi);
+        Array4<Real const> const& Jr_init = Jinit[0]->const_array(mfi);
+        Array4<Real const> const& Jt_init = Jinit[1]->const_array(mfi);
+        Array4<Real const> const& Jz_init = Jinit[2]->const_array(mfi);
         if (!use_dJ_for_resistive_term) {
             amrex::ignore_unused(Jr_init, Jt_init, Jz_init);
         }
@@ -739,7 +739,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jfield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jifield,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jextfield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& J_init,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Jinit,
     std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Bfield,
     std::unique_ptr<amrex::MultiFab> const& rhofield,
     std::unique_ptr<amrex::MultiFab> const& Pefield,
@@ -888,9 +888,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real const> const& rho = rhofield->const_array(mfi);
         Array4<Real> const& Pe = Pefield->array(mfi);
 
-        Array4<Real const> const& Jx_init = J_init[0]->const_array(mfi);
-        Array4<Real const> const& Jy_init = J_init[1]->const_array(mfi);
-        Array4<Real const> const& Jz_init = J_init[2]->const_array(mfi);
+        Array4<Real const> const& Jx_init = Jinit[0]->const_array(mfi);
+        Array4<Real const> const& Jy_init = Jinit[1]->const_array(mfi);
+        Array4<Real const> const& Jz_init = Jinit[2]->const_array(mfi);
         if (!use_dJ_for_resistive_term) {
             amrex::ignore_unused(Jx_init, Jy_init, Jz_init);
         }
@@ -935,7 +935,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
+                const bool at_density_floor = (rho_val < rho_floor);
+                if (at_density_floor) { rho_val = rho_floor; }
 
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
@@ -946,7 +947,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                const auto Jx0 = (use_dJ_for_resistive_term) ? Jx_init(i, j, k) : 0.0_rt;
+                const auto Jx0 = (use_dJ_for_resistive_term || at_density_floor) ? Jx_init(i, j, k) : 0.0_rt;
                 if (include_resistivity_term) { Ex(i, j, k) += eta(rho_val, jtot_val) * (Jx(i, j, k) - Jx0); }
 
                 if (include_hyper_resistivity_term) {
@@ -980,7 +981,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
+                const bool at_density_floor = (rho_val < rho_floor);
+                if (at_density_floor) { rho_val = rho_floor; }
 
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
@@ -991,7 +993,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                const auto Jy0 = (use_dJ_for_resistive_term) ? Jy_init(i, j, k) : 0.0_rt;
+                const auto Jy0 = (use_dJ_for_resistive_term || at_density_floor) ? Jy_init(i, j, k) : 0.0_rt;
                 if (include_resistivity_term) { Ey(i, j, k) += eta(rho_val, jtot_val) * (Jy(i, j, k) - Jy0); }
 
                 if (include_hyper_resistivity_term) {
@@ -1019,7 +1021,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 // safety condition since we divide by rho_val later
-                if (rho_val < rho_floor) { rho_val = rho_floor; }
+                const bool at_density_floor = (rho_val < rho_floor);
+                if (at_density_floor) { rho_val = rho_floor; }
 
                 // Get the gradient of the electron pressure
                 auto grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
@@ -1030,7 +1033,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val;
 
                 // Add resistivity only if E field value is used to update B
-                const auto Jz0 = (use_dJ_for_resistive_term) ? Jz_init(i, j, k) : 0.0_rt;
+                const auto Jz0 = (use_dJ_for_resistive_term || at_density_floor) ? Jz_init(i, j, k) : 0.0_rt;
                 if (include_resistivity_term) { Ez(i, j, k) += eta(rho_val, jtot_val) * (Jz(i, j, k) - Jz0); }
 
                 if (include_hyper_resistivity_term) {

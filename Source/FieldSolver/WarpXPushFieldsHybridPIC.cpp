@@ -198,6 +198,6 @@ void WarpX::HybridPICDepositInitialRhoAndJ ()
             PatchType::fine
         );
     }
-    if (m_hybrid_pic_model->m_use_dJ_for_resistive_term)
-        m_hybrid_pic_model->CalculateInitialCurrent(Bfield_fp, m_edge_lengths);
+    // if (m_hybrid_pic_model->m_use_dJ_for_resistive_term)
+    m_hybrid_pic_model->CalculateInitialCurrent(Bfield_fp, m_edge_lengths);
 }

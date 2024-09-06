@@ -152,6 +152,32 @@ void WarpX::HybridPICEvolveFields ()
     );
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
+    if (m_hybrid_pic_model->m_add_Poisson_solve) {
+
+        // The rest of this function handles logic to add a Poisson solve onto
+        // Ohm's law. This is done to allow specification of potentials on
+        // conducting boundaries (domain or embedded).
+        // The Ohm's law solution for E obtained so far
+        // contains both transverse (solenoidal) and longitudinal (irrotational)
+        // components. Our aim is to replace the longitudinal (electrostatic) part
+        // of the field with an updated electrostatic field which includes the
+        // effect of biased conductors. To this end, the following algorithm is
+        // followed:
+        // 1) the effective charge density from the Ohm's law solution is obtained
+        //    using rho = eps0 * div E
+        // 2) the electrostatic (irrotational) part of the E-field is removed using
+        //    the projection divergence cleaning method
+        // 3) the updated electrostatic field is calculated from Poisson's
+        //    equation using the earlier obtained charge density and desired
+        //    boundary conditions
+        // 4) the new electrostatic component is added back on to the remaining
+        //    solenoidal part of the electric field
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            false, "Ohm's law with Poisson solve not yet implemented."
+        );
+    }
+
     // Copy the rho^{n+1} values to rho_fp_temp and the J_i^{n+1/2} values to
     // current_fp_temp since at the next step those values will be needed as
     // rho^{n} and J_i^{n-1/2}.

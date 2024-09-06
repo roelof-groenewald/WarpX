@@ -54,6 +54,9 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("Jx_external_grid_function(x,y,z,t)", m_Jx_ext_grid_function);
     pp_hybrid.query("Jy_external_grid_function(x,y,z,t)", m_Jy_ext_grid_function);
     pp_hybrid.query("Jz_external_grid_function(x,y,z,t)", m_Jz_ext_grid_function);
+
+    // Flag setting whether the coupled Ohm's law + Poisson model should be used
+    pp_hybrid.query("add_Poisson_solve", m_add_Poisson_solve);
 }
 
 void HybridPICModel::AllocateMFs (int nlevs_max)

@@ -1783,6 +1783,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
+
+    add_Poisson_solve: bool, default=False
+        Whether to add a Poisson solve to the Ohm's law model.
     """
 
     def __init__(
@@ -1798,6 +1801,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
+        add_Poisson_solve=None,
         **kw,
     ):
         self.grid = grid
@@ -1815,6 +1819,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
         self.Jz_external_function = Jz_external_function
+
+        self.add_Poisson_solve = add_Poisson_solve
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1864,6 +1870,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.Jz_external_function, self.mangle_dict
             ),
         )
+        pywarpx.hybridpicmodel.add_Poisson_solve = self.add_Poisson_solve
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

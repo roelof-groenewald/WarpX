@@ -70,6 +70,10 @@ void HybridPICModel::ReadParameters ()
         }
         has_dirichlet = has_dirichlet || EB::enabled();
         if (!has_dirichlet) { m_add_Poisson_solve = false; }
+        pp_hybrid.query("required_precision_poisson", m_required_precision_poisson);
+        pp_hybrid.query("absolute_tolerance_poisson", m_absolute_tolerance_poisson);
+        pp_hybrid.query("max_iters_poisson", m_max_iters_poisson);
+        pp_hybrid.query("verbosity_poisson", m_verbosity_poisson);
     }
 }
 

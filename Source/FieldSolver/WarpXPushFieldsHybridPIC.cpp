@@ -255,9 +255,11 @@ void WarpX::HybridPICDoPoissonSolve ()
     setPhiBC(phi);
     const std::array<Real, 3> beta = {0._rt};
     computePhi(
-        rho_fp_temp, phi, beta, self_fields_required_precision,
-        self_fields_absolute_tolerance, self_fields_max_iters,
-        self_fields_verbosity
+        rho_fp_temp, phi, beta,
+        m_hybrid_pic_model->m_required_precision_poisson,
+        m_hybrid_pic_model->m_absolute_tolerance_poisson,
+        m_hybrid_pic_model->m_max_iters_poisson,
+        m_hybrid_pic_model->m_verbosity_poisson
     );
     if (!m_eb_enabled) { computeE( Efield_fp, phi, beta ); }
 
@@ -269,17 +271,17 @@ void WarpX::HybridPICDoPoissonSolve ()
         // involves a peculiarity of the ES solver in which we don't rescale rho
         // back after the Poisson solve)
         rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
-        // reset phi to zero
-        phi[lev]->setVal(0.);
     }
     // Appropriately set domain boundary potentials
     setPhiBC(phi);
     // Solve the Poisson equation with proper boundary conditions and add the
     // resulting electrostatic field back on to the E-field.
     computePhi(
-        rho_fp_temp, phi, beta, self_fields_required_precision,
-        self_fields_absolute_tolerance, self_fields_max_iters,
-        self_fields_verbosity
+        rho_fp_temp, phi, beta,
+        m_hybrid_pic_model->m_required_precision_poisson,
+        m_hybrid_pic_model->m_absolute_tolerance_poisson,
+        m_hybrid_pic_model->m_max_iters_poisson,
+        m_hybrid_pic_model->m_verbosity_poisson
     );
     if (!m_eb_enabled) { computeE( Efield_fp, phi, beta ); }
 }

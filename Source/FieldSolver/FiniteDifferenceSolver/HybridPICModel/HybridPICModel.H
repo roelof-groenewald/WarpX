@@ -189,6 +189,10 @@ public:
 
     /** Use the Ohm's law + Poisson model */
     bool m_add_Poisson_solve = false;
+    amrex::Real m_required_precision_poisson = 1e-5;
+    amrex::Real m_absolute_tolerance_poisson = 0.0;
+    int m_max_iters_poisson = 200;
+    int m_verbosity_poisson = 0;
 
     // Declare multifabs specifically needed for the hybrid-PIC model
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > rho_fp_temp;

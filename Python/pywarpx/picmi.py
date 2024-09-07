@@ -1802,6 +1802,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jy_external_function=None,
         Jz_external_function=None,
         add_Poisson_solve=None,
+        required_precision_poisson=None,
+        absolute_tolerance_poisson=None,
+        max_iters_poisson=None,
+        verbosity_poisson=None,
         **kw,
     ):
         self.grid = grid
@@ -1821,6 +1825,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.Jz_external_function = Jz_external_function
 
         self.add_Poisson_solve = add_Poisson_solve
+        self.required_precision_poisson = required_precision_poisson
+        self.absolute_tolerance_poisson = absolute_tolerance_poisson
+        self.max_iters_poisson = max_iters_poisson
+        self.verbosity_poisson = verbosity_poisson
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -1871,6 +1879,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             ),
         )
         pywarpx.hybridpicmodel.add_Poisson_solve = self.add_Poisson_solve
+        pywarpx.hybridpicmodel.required_precision_poisson = (
+            self.required_precision_poisson
+        )
+        pywarpx.hybridpicmodel.absolute_tolerance_poisson = (
+            self.absolute_tolerance_poisson
+        )
+        pywarpx.hybridpicmodel.max_iters_poisson = self.max_iters_poisson
+        pywarpx.hybridpicmodel.verbosity_poisson = self.verbosity_poisson
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

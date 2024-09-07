@@ -196,6 +196,7 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_ampere;
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_external;
     amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > electron_pressure_fp;
+    amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > phi;
 
     // Helper functions to retrieve hybrid-PIC multifabs
     [[nodiscard]] amrex::MultiFab*

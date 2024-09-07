@@ -664,6 +664,13 @@ public:
      */
     void HybridPICDepositInitialRhoAndJ ();
 
+    /**
+     * \brief Hybrid-PIC plus Poisson model implementation.
+     * The Ohm's law model is augmented in this function with a Poisson solve
+     * which allows the specification of potentials on conducting surfaces.
+     */
+    void HybridPICDoPoissonSolve ();
+
     /** apply QED correction on electric field
      *
      * \param dt vector of time steps (for all levels)

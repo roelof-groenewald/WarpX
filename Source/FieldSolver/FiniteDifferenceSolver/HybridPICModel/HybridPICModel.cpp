@@ -57,6 +57,20 @@ void HybridPICModel::ReadParameters ()
 
     // Flag setting whether the coupled Ohm's law + Poisson model should be used
     pp_hybrid.query("add_Poisson_solve", m_add_Poisson_solve);
+    if (m_add_Poisson_solve) {
+        // check if any boundaries are PEC, otherwise there is no point in
+        // using the Ohm + Poisson model
+        bool has_dirichlet = false;
+        for (int idim=0; idim<AMREX_SPACEDIM; idim++){
+            has_dirichlet = (
+                has_dirichlet
+                || (WarpX::field_boundary_lo[idim] == FieldBoundaryType::PEC)
+                || (WarpX::field_boundary_hi[idim] == FieldBoundaryType::PEC)
+            );
+        }
+        has_dirichlet = has_dirichlet || EB::enabled();
+        if (!has_dirichlet) { m_add_Poisson_solve = false; }
+    }
 }
 
 void HybridPICModel::AllocateMFs (int nlevs_max)
@@ -66,6 +80,7 @@ void HybridPICModel::AllocateMFs (int nlevs_max)
     current_fp_temp.resize(nlevs_max);
     current_fp_ampere.resize(nlevs_max);
     current_fp_external.resize(nlevs_max);
+    phi.resize(nlevs_max);
 }
 
 void HybridPICModel::AllocateLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm,
@@ -113,6 +128,11 @@ void HybridPICModel::AllocateLevelMFs (int lev, const BoxArray& ba, const Distri
     WarpX::AllocInitMultiFab(current_fp_external[lev][2], amrex::convert(ba, IntVect(AMREX_D_DECL(1,1,1))),
         dm, ncomps, IntVect(AMREX_D_DECL(0,0,0)), lev, "current_fp_external[z]", 0.0_rt);
 
+    if (m_add_Poisson_solve) {
+        WarpX::AllocInitMultiFab(phi[lev], amrex::convert(ba, IntVect(AMREX_D_DECL(1,1,1))),
+            dm, ncomps, ngRho, lev, "phi", 0.0_rt);
+    }
+
 #ifdef WARPX_DIM_RZ
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (ncomps == 1),
@@ -129,6 +149,7 @@ void HybridPICModel::ClearLevel (int lev)
         current_fp_ampere[lev][i].reset();
         current_fp_external[lev][i].reset();
     }
+    if (m_add_Poisson_solve) { phi[lev].reset(); }
 }
 
 void HybridPICModel::InitData ()

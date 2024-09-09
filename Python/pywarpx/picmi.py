@@ -1887,6 +1887,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         )
         pywarpx.hybridpicmodel.max_iters_poisson = self.max_iters_poisson
         pywarpx.hybridpicmodel.verbosity_poisson = self.verbosity_poisson
+        pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
+        pywarpx.boundary.potential_lo_y = self.grid.potential_ymin
+        pywarpx.boundary.potential_lo_z = self.grid.potential_zmin
+        pywarpx.boundary.potential_hi_x = self.grid.potential_xmax
+        pywarpx.boundary.potential_hi_y = self.grid.potential_ymax
+        pywarpx.boundary.potential_hi_z = self.grid.potential_zmax
 
 
 class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):

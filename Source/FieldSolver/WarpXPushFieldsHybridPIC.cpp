@@ -222,6 +222,12 @@ void WarpX::HybridPICDoPoissonSolve ()
     auto& rho_fp_temp = m_hybrid_pic_model->rho_fp_temp;
     auto& phi = m_hybrid_pic_model->phi;
 
+    // Store the boundary conditions for the field solver if they haven't been
+    // stored yet
+    if (!m_poisson_boundary_handler.bcs_set) {
+        m_poisson_boundary_handler.definePhiBCs(Geom(0));
+    }
+
     // Copy the actual boundary handler
     auto boundary_handler_copy = m_poisson_boundary_handler;
 

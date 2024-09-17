@@ -6,6 +6,7 @@
  */
 #include "FiniteDifferenceSolver.H"
 
+#include "EmbeddedBoundary/Enabled.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox.H"
 #ifndef WARPX_DIM_RZ
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
@@ -51,6 +52,7 @@ void FiniteDifferenceSolver::EvolveB (
     [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Bfield,
     [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
     [[maybe_unused]] std::unique_ptr<amrex::MultiFab> const& Gfield,
+    [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
     [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
     [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& area_mod,
     [[maybe_unused]] std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield,
@@ -72,10 +74,20 @@ void FiniteDifferenceSolver::EvolveB (
 
         EvolveBCartesian <CartesianNodalAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
 
-    } else if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee) ||
-               (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)) {
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee) {
 
         EvolveBCartesian <CartesianYeeAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
+
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
+
+        if (EB::enabled()) {
+            EvolveBCartesian (
+                Bfield, Efield, edge_lengths, face_areas, lev, dt, 0.25_rt
+            );
+        }
+        else {
+            EvolveBCartesian <CartesianYeeAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
+        }
 
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
@@ -181,6 +193,108 @@ void FiniteDifferenceSolver::EvolveBCartesian (
                 }
             );
         }
+
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+    }
+}
+
+
+void FiniteDifferenceSolver::EvolveBCartesian (
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& Bfield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
+    int lev, amrex::Real dt, amrex::Real area_cutoff ) {
+
+    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+        }
+        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        // Extract field data for this grid/tile
+        Array4<Real> const& Bx = Bfield[0]->array(mfi);
+        Array4<Real> const& By = Bfield[1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        Array4<Real> const& Ex = Efield[0]->array(mfi);
+        Array4<Real> const& Ey = Efield[1]->array(mfi);
+        Array4<Real> const& Ez = Efield[2]->array(mfi);
+        amrex::Array4<amrex::Real> const &lx = edge_lengths[0]->array(mfi);
+        amrex::Array4<amrex::Real> const &ly = edge_lengths[1]->array(mfi);
+        amrex::Array4<amrex::Real> const &lz = edge_lengths[2]->array(mfi);
+        amrex::Array4<amrex::Real> const &Sx = face_areas[0]->array(mfi);
+        amrex::Array4<amrex::Real> const &Sy = face_areas[1]->array(mfi);
+        amrex::Array4<amrex::Real> const &Sz = face_areas[2]->array(mfi);
+
+        // Extract stencil coefficients - for cell exclusion calculations
+        Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
+        Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
+        Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
+
+#ifdef WARPX_DIM_XZ
+        amrex::ignore_unused(coefs_y, ly, Sx, Sz);
+#endif
+
+        // Extract tileboxes for which to loop
+        Box const& tbx  = mfi.tilebox(Bfield[0]->ixType().toIntVect());
+        Box const& tby  = mfi.tilebox(Bfield[1]->ixType().toIntVect());
+        Box const& tbz  = mfi.tilebox(Bfield[2]->ixType().toIntVect());
+
+        amrex::ParallelFor(tbx, tby, tbz,
+
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+#ifdef WARPX_DIM_XZ
+                if (lz(i, j, k) * coefs_z[0] < area_cutoff) { return; }
+                Bx(i, j, k) += dt / lz(i, j, k) * (Ey(i, j + 1, k) - Ey(i, j, k));
+#else
+                if (Sx(i, j, k) * coefs_y[0] * coefs_z[0] < area_cutoff) { return; }
+                Bx(i, j, k) += dt / Sx(i, j, k) * (
+                    Ey(i, j, k + 1) * ly(i, j, k + 1) - Ey(i, j, k) * ly(i, j, k) -
+                    Ez(i, j + 1, k) * lz(i, j + 1, k) + Ez(i, j, k) * lz(i, j, k)
+                );
+#endif
+            },
+
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                if (Sy(i, j, k) * coefs_x[0] * coefs_z[0] < area_cutoff) { return; }
+#ifdef WARPX_DIM_XZ
+                By(i, j, k) += dt / Sy(i, j, k) * (
+                    Ez(i + 1, j, k) * lz(i + 1, j, k) - Ez(i, j, k) * lz(i, j, k) -
+                    Ex(i, j + 1, k) * lx(i, j + 1, k) + Ex(i, j, k) * lx(i, j, k)
+                );
+#else
+                By(i, j, k) += dt / Sy(i, j, k) * (
+                    Ez(i + 1, j, k) * lz(i + 1, j, k) - Ez(i, j, k) * lz(i, j, k) -
+                    Ex(i, j, k + 1) * lx(i, j, k + 1) + Ex(i, j, k) * lx(i, j, k)
+                );
+#endif
+            },
+
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+#ifdef WARPX_DIM_XZ
+                if (lx(i, j, k) * coefs_x[0] < area_cutoff) { return; }
+                Bz(i, j, k) += dt / lx(i, j, k) * (-Ey(i + 1, j, k) + Ey(i, j, k));
+#else
+                if (Sz(i, j, k)  * coefs_x[0] * coefs_y[0] < area_cutoff) { return; }
+                Bz(i, j, k) += dt / Sz(i, j, k) * (
+                    Ex(i, j + 1, k) * lx(i, j + 1, k) - Ex(i, j, k) * lx(i, j, k) -
+                    Ey(i + 1, j, k) * ly(i + 1, j, k) + Ey(i, j, k) * ly(i, j, k)
+                );
+#endif
+            }
+        );
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {

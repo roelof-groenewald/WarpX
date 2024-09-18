@@ -1088,6 +1088,8 @@ WarpX::InitializeExternalFieldsOnGridUsingParser (
             Sx = face_areas[0]->array(mfi);
             Sy = face_areas[1]->array(mfi);
             Sz = face_areas[2]->array(mfi);
+        } else {
+            amrex::ignore_unused(lx, ly, lz, Sx, Sy, Sz);
         }
 
 #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)

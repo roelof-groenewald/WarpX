@@ -297,13 +297,17 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         Real const one_over_mu0 = 1._rt / PhysConst::mu0;
 
         // Calculate the total current, using Ampere's law, on the same grid
-        // as the E-field
+        // as the E-field.
+        // Note that embedded boundary restrictions are not applied here since
+        // it is assumed that the magnetic field was initialized to respect
+        // the embedded boundary and since the B-field is not advanced inside
+        // the EB that boundary should remain accurate.
         amrex::ParallelFor(tjx, tjy, tjz,
 
             // Jx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip if this cell is fully covered by embedded boundaries
-                if (lx && lx(i, j, k) <= 0) { return; }
+                // if (lx && lx(i, j, k) <= 0) { return; }
 
                 Jx(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -314,13 +318,13 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             // Jy calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip if this cell is fully covered by embedded boundaries
-#ifdef WARPX_DIM_3D
-                if (ly && ly(i,j,k) <= 0) { return; }
-#elif defined(WARPX_DIM_XZ)
-                // In XZ Jy is associated with a mesh node, so we need to check if the mesh node is covered
-                amrex::ignore_unused(ly);
-                if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
-#endif
+// #ifdef WARPX_DIM_3D
+//                 if (ly && ly(i,j,k) <= 0) { return; }
+// #elif defined(WARPX_DIM_XZ)
+//                 // In XZ Jy is associated with a mesh node, so we need to check if the mesh node is covered
+//                 amrex::ignore_unused(ly);
+//                 if (lx && (lx(i, j, k)<=0 || lx(i-1, j, k)<=0 || lz(i, j-1, k)<=0 || lz(i, j, k)<=0)) { return; }
+// #endif
                 Jy(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
                     + T_Algo::DownwardDz(Bx, coefs_z, n_coefs_z, i, j, k)
@@ -330,7 +334,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Skip if this cell is fully covered by embedded boundaries
-                if (lz && lz(i,j,k) <= 0) { return; }
+                // if (lz && lz(i,j,k) <= 0) { return; }
 
                 Jz(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)

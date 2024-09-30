@@ -1522,8 +1522,7 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         # --- Same method names are used, though mapped to lower case.
         pywarpx.algo.maxwell_solver = self.method
 
-        if self.cfl is not None:
-            pywarpx.warpx.cfl = self.cfl
+        pywarpx.warpx.cfl = self.cfl
 
         if self.source_smoother is not None:
             self.source_smoother.smoother_initialize_inputs(self)
@@ -1879,14 +1878,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             ),
         )
         pywarpx.hybridpicmodel.add_Poisson_solve = self.add_Poisson_solve
-        pywarpx.hybridpicmodel.required_precision_poisson = (
-            self.required_precision_poisson
-        )
-        pywarpx.hybridpicmodel.absolute_tolerance_poisson = (
-            self.absolute_tolerance_poisson
-        )
-        pywarpx.hybridpicmodel.max_iters_poisson = self.max_iters_poisson
-        pywarpx.hybridpicmodel.verbosity_poisson = self.verbosity_poisson
+        pywarpx.warpx.self_fields_required_precision = self.required_precision_poisson
+        pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance_poisson
+        pywarpx.warpx.self_fields_max_iters = self.max_iters_poisson
+        pywarpx.warpx.self_fields_verbosity = self.verbosity_poisson
         pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
         pywarpx.boundary.potential_lo_y = self.grid.potential_ymin
         pywarpx.boundary.potential_lo_z = self.grid.potential_zmin
@@ -1909,6 +1904,26 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the lab frame solver
+
+    warpx_magnetostatic: bool, default=False
+        Whether to use the magnetostatic solver
+
+    warpx_semi_implicit: bool, default=False
+        Whether to use the semi-implicit Poisson solver
+
+    warpx_semi_implicit_factor: float, default=4
+        If the semi-implicit Poisson solver is used, this sets the value
+        of C_SI (the method is marginally stable at C_SI = 1)
+
+    warpx_dt_update_interval: string, optional (default = -1)
+        How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
+
+    warpx_cfl: float, optional
+        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `dt_update_interval > 0`.
+
+    warpx_max_dt: float, optional
+        The maximum allowable timestep when `dt_update_interval > 0`.
+
     """
 
     def init(self, kw):
@@ -1916,6 +1931,11 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
+        self.semi_implicit = kw.pop("warpx_semi_implicit", False)
+        self.semi_implicit_factor = kw.pop("warpx_semi_implicit_factor", None)
+        self.cfl = kw.pop("warpx_cfl", None)
+        self.dt_update_interval = kw.pop("dt_update_interval", None)
+        self.max_dt = kw.pop("warpx_max_dt", None)
 
     def solver_initialize_inputs(self):
         # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
@@ -1923,11 +1943,19 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
         self.grid.grid_initialize_inputs()
 
+        # set adaptive timestepping parameters
+        pywarpx.warpx.cfl = self.cfl
+        pywarpx.warpx.dt_update_interval = self.dt_update_interval
+        pywarpx.warpx.max_dt = self.max_dt
+
         if self.relativistic:
             pywarpx.warpx.do_electrostatic = "relativistic"
         else:
             if self.magnetostatic:
                 pywarpx.warpx.do_electrostatic = "labframe-electromagnetostatic"
+            elif self.semi_implicit:
+                pywarpx.warpx.do_electrostatic = "labframe-semi-implicit"
+                pywarpx.warpx.semi_implicit_factor = self.semi_implicit_factor
             else:
                 pywarpx.warpx.do_electrostatic = "labframe"
             pywarpx.warpx.self_fields_required_precision = self.required_precision
@@ -3919,6 +3947,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             "ParticleNumber",
             "LoadBalanceCosts",
             "LoadBalanceEfficiency",
+            "Timestep",
         ]
         # The species diagnostics require a species to be provided
         self._species_reduced_diagnostics = [

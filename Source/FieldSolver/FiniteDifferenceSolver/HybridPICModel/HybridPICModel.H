@@ -14,10 +14,13 @@
 
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include "FieldSolver/ElectrostaticSolvers/SemiImplicitES.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXProfilerWrapper.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -31,20 +34,17 @@
 class HybridPICModel
 {
 public:
-    HybridPICModel (int nlevs_max); // constructor
+    HybridPICModel ();
 
     /** Read user-defined model parameters. Called in constructor. */
     void ReadParameters ();
 
     /** Allocate hybrid-PIC specific multifabs. Called in constructor. */
-    void AllocateMFs (int nlevs_max);
-    void AllocateLevelMFs (int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
+    void AllocateLevelMFs (ablastr::fields::MultiFabRegister & fields,
+                           int lev, const amrex::BoxArray& ba, const amrex::DistributionMapping& dm,
                            int ncomps, const amrex::IntVect& ngJ, const amrex::IntVect& ngRho,
                            const amrex::IntVect& jx_nodal_flag, const amrex::IntVect& jy_nodal_flag,
                            const amrex::IntVect& jz_nodal_flag, const amrex::IntVect& rho_nodal_flag);
-
-    /** Helper function to clear values from hybrid-PIC specific multifabs. */
-    void ClearLevel (int lev);
 
     void InitData ();
 
@@ -55,10 +55,10 @@ public:
      * of time and therefore this should be re-evaluated at every step.
      */
     void GetCurrentExternal (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths
+        ablastr::fields::MultiLevelVectorField const& edge_lengths
     );
     void GetCurrentExternal (
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& edge_lengths,
+        ablastr::fields::VectorField const& edge_lengths,
         int lev
     );
 
@@ -72,12 +72,12 @@ public:
      * \param[in] edge_lengths Length of cell edges taking embedded boundaries into account
      */
     void CalculateCurrentAmpere (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& edge_lengths
     );
     void CalculateCurrentAmpere (
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Bfield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& edge_lengths,
+        ablastr::fields::VectorField const& Bfield,
+        ablastr::fields::VectorField const& edge_lengths,
         int lev
     );
 
@@ -86,53 +86,53 @@ public:
      * Function to update the E-field using Ohm's law (hybrid-PIC model).
      */
     void HybridPICSolveE (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Jfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Bfield,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths,
-        bool solve_for_Faraday);
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        ablastr::fields::MultiLevelVectorField const& edge_lengths,
+        bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
-        std::array< std::unique_ptr<amrex::MultiFab>, 3>& Efield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Jfield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Bfield,
-        std::unique_ptr<amrex::MultiFab> const& rhofield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& edge_lengths,
-        int lev, bool solve_for_Faraday);
+        ablastr::fields::VectorField const& Efield,
+        ablastr::fields::VectorField const& Jfield,
+        ablastr::fields::VectorField const& Bfield,
+        amrex::MultiFab const& rhofield,
+        ablastr::fields::VectorField const& edge_lengths,
+        int lev, bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
-        std::array< std::unique_ptr<amrex::MultiFab>, 3>& Efield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Jfield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& Bfield,
-        std::unique_ptr<amrex::MultiFab> const& rhofield,
-        std::array< std::unique_ptr<amrex::MultiFab>, 3> const& edge_lengths,
-        int lev, PatchType patch_type, bool solve_for_Faraday);
+        ablastr::fields::VectorField const& Efield,
+        ablastr::fields::VectorField const& Jfield,
+        ablastr::fields::VectorField const& Bfield,
+        amrex::MultiFab const& rhofield,
+        ablastr::fields::VectorField const& edge_lengths,
+        int lev, PatchType patch_type, bool solve_for_Faraday) const;
 
     void BfieldEvolveRK (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Jfield,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths,
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, DtType a_dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolveRK (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Jfield,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths,
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, int lev, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void FieldPush (
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Bfield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>>& Efield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& Jfield,
-        amrex::Vector<std::unique_ptr<amrex::MultiFab>> const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3>> const& edge_lengths,
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        ablastr::fields::MultiLevelVectorField const& edge_lengths,
         amrex::Real dt, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -141,8 +141,8 @@ public:
      * Function to calculate the electron pressure using the simulation charge
      * density. Used in the Ohm's law solver (kinetic-fluid hybrid model).
      */
-    void CalculateElectronPressure ();
-    void CalculateElectronPressure (int lev);
+    void CalculateElectronPressure () const;
+    void CalculateElectronPressure (int lev) const;
 
     /**
      * \brief Fill the electron pressure multifab given the kinetic particle
@@ -153,8 +153,18 @@ public:
      * \param[in] rho_field scalar ion charge density Multifab at a given level
      */
     void FillElectronPressureMF (
-        std::unique_ptr<amrex::MultiFab> const& Pe_field,
-        amrex::MultiFab* const& rho_field ) const;
+        amrex::MultiFab& Pe_field,
+        amrex::MultiFab const& rho_field ) const;
+
+    /**
+     * \brief Hybrid-PIC plus Poisson model implementation.
+     * The Ohm's law model is augmented in this function with a Poisson solve
+     * which allows the specification of potentials on conducting surfaces.
+     */
+    void HybridPICPoissonSolve(
+        ablastr::fields::MultiFabRegister& fields,
+        const int finest_level
+    );
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B */
@@ -189,37 +199,7 @@ public:
 
     /** Use the Ohm's law + Poisson model */
     bool m_add_Poisson_solve = false;
-    amrex::Real m_required_precision_poisson = 1e-5;
-    amrex::Real m_absolute_tolerance_poisson = 0.0;
-    int m_max_iters_poisson = 200;
-    int m_verbosity_poisson = 0;
-
-    // Declare multifabs specifically needed for the hybrid-PIC model
-    amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > rho_fp_temp;
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_temp;
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_ampere;
-    amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > current_fp_external;
-    amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > electron_pressure_fp;
-    amrex::Vector<            std::unique_ptr<amrex::MultiFab>      > phi;
-
-    // Helper functions to retrieve hybrid-PIC multifabs
-    [[nodiscard]] amrex::MultiFab*
-    get_pointer_current_fp_ampere  (int lev, int direction) const
-    {
-        return current_fp_ampere[lev][direction].get();
-    }
-
-    [[nodiscard]] amrex::MultiFab*
-    get_pointer_current_fp_external (int lev, int direction) const
-    {
-        return current_fp_external[lev][direction].get();
-    }
-
-    [[nodiscard]] amrex::MultiFab*
-    get_pointer_electron_pressure_fp  (int lev) const
-    {
-        return electron_pressure_fp[lev].get();
-    }
+    std::unique_ptr<SemiImplicitES> m_electrostatic_solver;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

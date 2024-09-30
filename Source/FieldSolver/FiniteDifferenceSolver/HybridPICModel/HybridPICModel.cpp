@@ -775,10 +775,8 @@ void HybridPICModel::HybridPICPoissonSolve (
     *(m_electrostatic_solver->m_poisson_boundary_handler) = boundary_handler_copy;
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        // Multiply charge density with -eps0 to get proper charge density (this
-        // involves a peculiarity of the ES solver in which we don't rescale rho
-        // back after the Poisson solve)
-        rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
+        // Multiply charge density with -1 to now get the proper charge density
+        rho_fp_temp[lev]->mult(-1);
     }
     // Appropriately set domain boundary potentials
     m_electrostatic_solver->setPhiBC(phi_fp, warpx.gett_new(0));

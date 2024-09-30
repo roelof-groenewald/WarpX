@@ -154,8 +154,7 @@ computeSemiImplicitPhi (
     for (int lev=0; lev<=finest_level; lev++) {
 
         // Use the Multigrid (MLMG) solver but first scale rho appropriately
-        using namespace ablastr::constant::SI;
-        rho[lev]->mult(-1._rt/ep0);  // TODO: when do we "un-multiply" this? We need to document this side-effect!
+        rho[lev]->mult(-1._rt/ablastr::constant::SI::ep0);
 
 #if defined(AMREX_USE_EB) || defined(WARPX_DIM_RZ)
         // Use the EB enabled solver.
@@ -246,6 +245,7 @@ computeSemiImplicitPhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
+        rho[lev]->mult(-ablastr::constant::SI::ep0);  // Multiply rho by epsilon again
 
     } // loop over lev(els)
 }

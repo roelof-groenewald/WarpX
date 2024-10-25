@@ -63,6 +63,11 @@ void SemiImplicitES::ComputeSpaceChargeField (
 
     // perform phi calculation
     computePhi(rho_fp, phi_fp);
+
+    // Compute the electric field. Note that if an EB is used the electric
+    // field will be calculated in the computePhi call.
+    const std::array<Real, 3> beta = {0._rt};
+    if (!EB::enabled()) { computeE( Efield_fp, phi_fp, beta ); }
 }
 
 void SemiImplicitES::computePhi (
@@ -240,12 +245,12 @@ void SemiImplicitES::computePhi (
         warpx.DistributionMap(),
         warpx.boxArray(),
         WarpX::grid_type,
-        *m_poisson_boundary_handler,
         false,
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
         post_phi_calculation,
+        *m_poisson_boundary_handler,
         warpx.gett_new(0),
         eb_farray_box_factory
     );

@@ -14,7 +14,7 @@
 
 #include "Utils/WarpXAlgorithmSelection.H"
 
-#include "FieldSolver/ElectrostaticSolvers/SemiImplicitES.H"
+#include "FieldSolver/ElectrostaticSolvers/EffectivePotentialES.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
@@ -193,7 +193,7 @@ public:
 
     /** Use the Ohm's law + Poisson model */
     bool m_add_Poisson_solve = false;
-    std::unique_ptr<SemiImplicitES> m_electrostatic_solver;
+    std::unique_ptr<EffectivePotentialES> m_electrostatic_solver;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

@@ -10,6 +10,7 @@
 #include "HybridPICModel.H"
 
 #include "EmbeddedBoundary/Enabled.H"
+#include "Python/callbacks.H"
 #include "Fields.H"
 #include "WarpX.H"
 
@@ -578,6 +579,91 @@ void HybridPICModel::FieldPush (
     warpx.FillBoundaryB(ng, nodal_sync);
 }
 
+// void HybridPICModel::HybridPICPoissonSolve (
+//     ablastr::fields::MultiFabRegister& fields,
+//     const int finest_level)
+// {
+//     // This function handles logic to add a Poisson solve onto Ohm's law.
+//     // This is done to allow specification of potentials on conducting
+//     // boundaries (domain or embedded).
+//     // The Ohm's law solution for E obtained so far contains both transverse
+//     // (solenoidal) and longitudinal (irrotational) components. Our aim is to
+//     // replace the longitudinal (electrostatic) part of the field with an
+//     // updated electrostatic field which includes the effect of biased
+//     // conductors. To this end, the following algorithm is followed:
+//     // 1) the effective charge density from the Ohm's law solution is obtained
+//     //    using rho = eps0 * div E
+//     // 2) the electrostatic (longitudinal) part of the E-field is removed
+//     //    using the projection divergence cleaning method
+//     // 3) the updated electrostatic field is calculated from Poisson's
+//     //    equation using the earlier obtained charge density and desired
+//     //    boundary conditions
+//     // 4) the new electrostatic component is added back on to the remaining
+//     //    solenoidal part of the electric field
+
+//     // Reference needed multifabs
+//     using warpx::fields::FieldType;
+//     ablastr::fields::MultiLevelScalarField rho_fp_temp = fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
+//     ablastr::fields::MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, finest_level);
+//     ablastr::fields::MultiLevelVectorField const& Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
+
+//     // Copy the Poisson boundary handler in order to modify the boundary
+//     // conditions on the initial solve
+//     auto boundary_handler_copy = *(m_electrostatic_solver->m_poisson_boundary_handler);
+
+//     // Create a dummy ParserExecutor that always returns 0 to be used as a
+//     // replacement for the actual boundary handler values
+//     auto dummy_parser = utils::parser::makeParser("0", {"t"});
+//     auto dummy_executor = dummy_parser.compile<1>();
+
+//     auto& warpx = WarpX::GetInstance();
+//     // Store the negative of the effective charge density in rho_fp_temp
+//     for (int lev = 0; lev <= finest_level; ++lev)
+//     {
+//         warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield_fp[lev], *rho_fp_temp[lev]);
+//         // note the minus sign since we want to subtract the electrostatic part from E
+//         rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
+//         // Synchronize the ghost cells, do halo exchange
+//         rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
+//     }
+
+//     // Perform a Poisson solve with the obtained charge density and add the
+//     // resulting E-field to Efield_fp. Before doing the solve we set the
+//     // PEC boundary potentials to 0 as well as the EB potential
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_xlo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_xlo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_ylo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_ylo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_zlo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_zlo = dummy_executor;
+//     m_electrostatic_solver->m_poisson_boundary_handler->phi_EB_only_t = true;
+//     m_electrostatic_solver->m_poisson_boundary_handler->potential_eb_t = dummy_executor;
+//     m_electrostatic_solver->setPhiBC(phi_fp, warpx.gett_new(0));
+//     m_electrostatic_solver->computePhi(rho_fp_temp, phi_fp);
+//     if (!EB::enabled()) {
+//         const std::array<Real, 3> beta = {0._rt};
+//         m_electrostatic_solver->computeE( Efield_fp, phi_fp, beta );
+//     }
+
+//     // Reset the boundary handler to the original version
+//     *(m_electrostatic_solver->m_poisson_boundary_handler) = boundary_handler_copy;
+//     for (int lev = 0; lev <= finest_level; ++lev)
+//     {
+//         // Multiply charge density with -1 to now get the proper charge density
+//         rho_fp_temp[lev]->mult(-1);
+//     }
+//     // Appropriately set domain boundary potentials
+//     m_electrostatic_solver->setPhiBC(phi_fp, warpx.gett_new(0));
+//     // Solve the Poisson equation with proper boundary conditions and add the
+//     // resulting electrostatic field back on to the E-field.
+//     m_electrostatic_solver->computePhi(rho_fp_temp, phi_fp);
+//     if (!EB::enabled()) {
+//         const std::array<Real, 3> beta = {0._rt};
+//         m_electrostatic_solver->computeE( Efield_fp, phi_fp, beta );
+//     }
+// }
+
+
 void HybridPICModel::HybridPICPoissonSolve (
     ablastr::fields::MultiFabRegister& fields,
     const int finest_level)
@@ -585,20 +671,16 @@ void HybridPICModel::HybridPICPoissonSolve (
     // This function handles logic to add a Poisson solve onto Ohm's law.
     // This is done to allow specification of potentials on conducting
     // boundaries (domain or embedded).
-    // The Ohm's law solution for E obtained so far contains both transverse
-    // (solenoidal) and longitudinal (irrotational) components. Our aim is to
-    // replace the longitudinal (electrostatic) part of the field with an
-    // updated electrostatic field which includes the effect of biased
-    // conductors. To this end, the following algorithm is followed:
-    // 1) the effective charge density from the Ohm's law solution is obtained
-    //    using rho = eps0 * div E
-    // 2) the electrostatic (longitudinal) part of the E-field is removed
-    //    using the projection divergence cleaning method
-    // 3) the updated electrostatic field is calculated from Poisson's
-    //    equation using the earlier obtained charge density and desired
-    //    boundary conditions
-    // 4) the new electrostatic component is added back on to the remaining
-    //    solenoidal part of the electric field
+    // When using this approach the electron temperature should be set to 0
+    // in the Ohm's law solver, that way the solution for E obtained so far
+    // contains mostly a transverse (solenoidal) component. We then add a
+    // longitudinal (electrostatic) part to the field obtained from the net,
+    // non-neutral charge density and the effect of biased
+    // conductors.
+
+    // Temporary implementation - use poissonsolver callback to set proper
+    // charge density values in the rho_fp_temp multifab
+    ExecutePythonCallback("poissonsolver");
 
     // Reference needed multifabs
     using warpx::fields::FieldType;
@@ -606,55 +688,21 @@ void HybridPICModel::HybridPICPoissonSolve (
     ablastr::fields::MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, finest_level);
     ablastr::fields::MultiLevelVectorField const& Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
 
-    // Copy the Poisson boundary handler in order to modify the boundary
-    // conditions on the initial solve
-    auto boundary_handler_copy = *(m_electrostatic_solver->m_poisson_boundary_handler);
-
-    // Create a dummy ParserExecutor that always returns 0 to be used as a
-    // replacement for the actual boundary handler values
-    auto dummy_parser = utils::parser::makeParser("0", {"t"});
-    auto dummy_executor = dummy_parser.compile<1>();
-
     auto& warpx = WarpX::GetInstance();
-    // Store the negative of the effective charge density in rho_fp_temp
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield_fp[lev], *rho_fp_temp[lev]);
-        // note the minus sign since we want to subtract the electrostatic part from E
-        rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
-        // Synchronize the ghost cells, do halo exchange
-        rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
-    }
+    // Should we add the charge density from E?
+    // // Store the effective charge density in rho_fp_temp
+    // for (int lev = 0; lev <= finest_level; ++lev)
+    // {
+    //     warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield_fp[lev], *rho_fp_temp[lev]);
+    //     rho_fp_temp[lev]->mult(ablastr::constant::SI::ep0);
+    //     // Synchronize the ghost cells, do halo exchange
+    //     rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
+    // }
 
-    // Perform a Poisson solve with the obtained charge density and add the
-    // resulting E-field to Efield_fp. Before doing the solve we set the
-    // PEC boundary potentials to 0 as well as the EB potential
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_xlo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_xlo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_ylo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_ylo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_zlo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_zlo = dummy_executor;
-    m_electrostatic_solver->m_poisson_boundary_handler->phi_EB_only_t = true;
-    m_electrostatic_solver->m_poisson_boundary_handler->potential_eb_t = dummy_executor;
+    // Perform a Poisson solve with the charge density in rho_fp_temp and the
+    // desired biasing boundary conditions applied. Then add the resulting
+    // electrostatic E-field to Efield_fp.
     m_electrostatic_solver->setPhiBC(phi_fp, warpx.gett_new(0));
-    m_electrostatic_solver->computePhi(rho_fp_temp, phi_fp);
-    if (!EB::enabled()) {
-        const std::array<Real, 3> beta = {0._rt};
-        m_electrostatic_solver->computeE( Efield_fp, phi_fp, beta );
-    }
-
-    // Reset the boundary handler to the original version
-    *(m_electrostatic_solver->m_poisson_boundary_handler) = boundary_handler_copy;
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        // Multiply charge density with -1 to now get the proper charge density
-        rho_fp_temp[lev]->mult(-1);
-    }
-    // Appropriately set domain boundary potentials
-    m_electrostatic_solver->setPhiBC(phi_fp, warpx.gett_new(0));
-    // Solve the Poisson equation with proper boundary conditions and add the
-    // resulting electrostatic field back on to the E-field.
     m_electrostatic_solver->computePhi(rho_fp_temp, phi_fp);
     if (!EB::enabled()) {
         const std::array<Real, 3> beta = {0._rt};

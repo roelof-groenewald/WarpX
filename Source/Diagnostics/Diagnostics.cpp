@@ -81,7 +81,8 @@ Diagnostics::BaseReadParameters ()
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
             warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential,
+            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential ||
+            warpx.electromagnetic_solver_id==ElectromagneticSolverAlgo::HybridPIC,
             "plot phi only works if do_electrostatic = labframe, do_electrostatic = labframe-electromagnetostatic or do_electrostatic = labframe-effective-potential");
     }
 

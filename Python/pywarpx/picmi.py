@@ -1877,6 +1877,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         required_precision_poisson=None,
         absolute_tolerance_poisson=None,
         max_iters_poisson=None,
+        effective_potential_factor_poisson=None,
         verbosity_poisson=None,
         **kw,
     ):
@@ -1900,6 +1901,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.required_precision_poisson = required_precision_poisson
         self.absolute_tolerance_poisson = absolute_tolerance_poisson
         self.max_iters_poisson = max_iters_poisson
+        self.effective_potential_factor_poisson = effective_potential_factor_poisson
         self.verbosity_poisson = verbosity_poisson
 
         # Handle keyword arguments used in expressions
@@ -1954,6 +1956,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.warpx.self_fields_required_precision = self.required_precision_poisson
         pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance_poisson
         pywarpx.warpx.self_fields_max_iters = self.max_iters_poisson
+        pywarpx.warpx.effective_potential_factor = (
+            self.effective_potential_factor_poisson
+        )
         pywarpx.warpx.self_fields_verbosity = self.verbosity_poisson
         pywarpx.boundary.potential_lo_x = self.grid.potential_xmin
         pywarpx.boundary.potential_lo_y = self.grid.potential_ymin

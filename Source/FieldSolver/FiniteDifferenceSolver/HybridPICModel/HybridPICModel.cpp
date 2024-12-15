@@ -371,6 +371,10 @@ void HybridPICModel::HybridPICSolveE (
 
 void HybridPICModel::CalculateElectronPressure() const
 {
+    if (m_elec_temp == 0._rt) {
+        return;
+    }
+
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {

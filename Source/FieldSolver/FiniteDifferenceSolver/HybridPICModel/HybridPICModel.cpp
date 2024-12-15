@@ -682,10 +682,6 @@ void HybridPICModel::HybridPICPoissonSolve (
     // non-neutral charge density and the effect of biased
     // conductors.
 
-    // Temporary implementation - use poissonsolver callback to set proper
-    // charge density values in the rho_fp_temp multifab
-    ExecutePythonCallback("poissonsolver");
-
     // Reference needed multifabs
     using warpx::fields::FieldType;
     ablastr::fields::MultiLevelScalarField rho_fp_temp = fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, finest_level);
@@ -694,14 +690,19 @@ void HybridPICModel::HybridPICPoissonSolve (
 
     auto& warpx = WarpX::GetInstance();
     // Should we add the charge density from E?
-    // // Store the effective charge density in rho_fp_temp
-    // for (int lev = 0; lev <= finest_level; ++lev)
-    // {
-    //     warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield_fp[lev], *rho_fp_temp[lev]);
-    //     rho_fp_temp[lev]->mult(ablastr::constant::SI::ep0);
-    //     // Synchronize the ghost cells, do halo exchange
-    //     rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
-    // }
+    // Store the negative of the effective charge density in rho_fp_temp
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(Efield_fp[lev], *rho_fp_temp[lev]);
+        // note the minus sign since we want to subtract the electrostatic part from E
+        rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
+        // Synchronize the ghost cells, do halo exchange
+        rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
+    }
+
+    // Temporary implementation - use poissonsolver callback to set proper
+    // charge density values in the rho_fp_temp multifab
+    ExecutePythonCallback("poissonsolver");
 
     // Perform a Poisson solve with the charge density in rho_fp_temp and the
     // desired biasing boundary conditions applied. Then add the resulting

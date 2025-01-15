@@ -323,6 +323,8 @@ void HybridPICModel::HybridPICSolveE (
             edge_lengths[lev], lev, solve_for_Faraday
         );
     }
+    // Allow execution of Python callback after E-field push
+    ExecutePythonCallback("afterEpush");
 }
 
 void HybridPICModel::HybridPICSolveE (

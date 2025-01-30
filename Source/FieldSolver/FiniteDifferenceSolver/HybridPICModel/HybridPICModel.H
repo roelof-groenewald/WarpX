@@ -63,15 +63,15 @@ public:
      * subtracted as well. Used in the Ohm's law solver (kinetic-fluid hybrid model).
      *
      * \param[in] Bfield       Magnetic field from which the current is calculated.
-     * \param[in] edge_lengths Length of cell edges taking embedded boundaries into account
+     * \param[in] eb_update_E  Indicate in which cell J should be calculated (related to embedded boundaries).
      */
     void CalculatePlasmaCurrent (
         ablastr::fields::MultiLevelVectorField const& Bfield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E
     );
     void CalculatePlasmaCurrent (
         ablastr::fields::VectorField const& Bfield,
-        ablastr::fields::VectorField const& edge_lengths,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev
     );
 
@@ -84,7 +84,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
@@ -92,7 +92,7 @@ public:
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        ablastr::fields::VectorField const& edge_lengths,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, bool solve_for_Faraday) const;
 
     void HybridPICSolveE (
@@ -100,7 +100,7 @@ public:
         ablastr::fields::VectorField const& Jfield,
         ablastr::fields::VectorField const& Bfield,
         amrex::MultiFab const& rhofield,
-        ablastr::fields::VectorField const& edge_lengths,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, PatchType patch_type, bool solve_for_Faraday) const;
 
     void BfieldEvolveRK (
@@ -108,7 +108,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, DtType a_dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -117,7 +117,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, int lev, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -126,7 +126,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
-        ablastr::fields::MultiLevelVectorField const& edge_lengths,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt, DtType dt_type,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 

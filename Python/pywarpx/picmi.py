@@ -2586,7 +2586,7 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         **kw,
     ):
         assert stl_file is None or implicit_function is None, Exception(
-            "Only one between implicit_function and " "stl_file can be specified"
+            "Only one between implicit_function and stl_file can be specified"
         )
 
         self.implicit_function = implicit_function
@@ -2696,9 +2696,9 @@ class PlasmaLens(picmistandard.base._ClassWithInit):
         self.strengths_E = strengths_E
         self.strengths_B = strengths_B
 
-        assert (self.strengths_E is not None) or (
-            self.strengths_B is not None
-        ), Exception("One of strengths_E or strengths_B must be supplied")
+        assert (self.strengths_E is not None) or (self.strengths_B is not None), (
+            Exception("One of strengths_E or strengths_B must be supplied")
+        )
 
         self.handle_init(kw)
 
@@ -3041,9 +3041,9 @@ class Simulation(picmistandard.PICMI_Simulation):
         particle_shape = self.particle_shape
         for s in self.species:
             if s.particle_shape is not None:
-                assert (
-                    particle_shape is None or particle_shape == s.particle_shape
-                ), Exception("WarpX only supports one particle shape for all species")
+                assert particle_shape is None or particle_shape == s.particle_shape, (
+                    Exception("WarpX only supports one particle shape for all species")
+                )
                 # --- If this was set for any species, use that value.
                 particle_shape = s.particle_shape
 
@@ -4132,7 +4132,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             kw = self._handle_charge_on_eb(**kw)
         else:
             raise RuntimeError(
-                f"{self.type} reduced diagnostic is not yet supported " "in pywarpx."
+                f"{self.type} reduced diagnostic is not yet supported in pywarpx."
             )
 
         self.handle_init(kw)

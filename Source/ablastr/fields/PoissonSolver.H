@@ -179,6 +179,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] grids the grids per level (e.g., from AmrMesh)
  * \param[in] grid_type Integer that corresponds to the type of grid used in the simulation (collocated, staggered, hybrid)
  * \param[in] is_solver_igf_on_lev0 boolean to select the Poisson solver: 1 for FFT on level 0 & Multigrid on other levels, 0 for Multigrid on all levels
+ * \param[in] is_igf_2d boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
@@ -206,6 +207,7 @@ computePhi (
     amrex::Vector<amrex::BoxArray> const& grids,
     utils::enums::GridType grid_type,
     bool is_solver_igf_on_lev0,
+    [[maybe_unused]] bool const is_igf_2d,
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
@@ -233,13 +235,13 @@ computePhi (
 #endif
 
 #if !defined(ABLASTR_USE_FFT)
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "Must compile with FFT support to use the IGF solver!");
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "Must compile with FFT support to use the IGF solver!");
 #endif
 
 #if !defined(WARPX_DIM_3D)
-        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-        "The FFT Poisson solver is currently only implemented for 3D!");
+    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
+    "The FFT Poisson solver is currently only implemented for 3D!");
 #endif
 
     // Set the value of beta
@@ -270,7 +272,7 @@ computePhi (
             if ( max_norm_b == 0 ) {
                 phi[lev]->setVal(0);
             } else {
-                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev] );
+                computePhiIGF( *rho[lev], *phi[lev], dx_scaled, grids[lev], is_igf_2d);
             }
             continue;
         }

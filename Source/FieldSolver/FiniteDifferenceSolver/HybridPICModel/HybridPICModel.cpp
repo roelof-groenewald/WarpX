@@ -697,7 +697,9 @@ void HybridPICModel::HybridPICPoissonSolve (
         // note the minus sign since we want to subtract the electrostatic part from E
         rho_fp_temp[lev]->mult(-ablastr::constant::SI::ep0);
         // Synchronize the ghost cells, do halo exchange
-        rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
+        // rho_fp_temp[lev]->FillBoundary(warpx.Geom(lev).periodicity());
+        // Handle the parallel transfer of guard cells and apply filtering
+        warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho_fp_temp[lev], 0, rho_fp_temp[lev]->nComp());
     }
 
     // Temporary implementation - use poissonsolver callback to set proper

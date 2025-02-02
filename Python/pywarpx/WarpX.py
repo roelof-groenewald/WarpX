@@ -21,6 +21,7 @@ from .Diagnostics import diagnostics, reduced_diagnostics
 from .EB2 import eb2
 from .Geometry import geometry
 from .HybridPICModel import hybridpicmodel
+from .Insulator import insulator
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
 from .Particles import particles, particles_list
@@ -49,6 +50,7 @@ class WarpX(Bucket):
         argv += boundary.attrlist()
         argv += algo.attrlist()
         argv += interpolation.attrlist()
+        argv += insulator.attrlist()
         argv += projectiondivbcleaner.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()

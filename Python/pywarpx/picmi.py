@@ -26,6 +26,7 @@ picmistandard.register_codename(codename)
 BC_map = {
     "open": "pml",
     "dirichlet": "pec",
+    "pec_insulator": "pec_insulator",
     "periodic": "periodic",
     "damped": "damped",
     "absorbing_silver_mueller": "absorbing_silver_mueller",
@@ -980,6 +981,10 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
         If a thermal boundary is used for particles, this dictionary should
         specify the thermal speed for each species in the form {`<species>`: u_th}.
         Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
+
+    warpx_insulator_expressions: dict, default=None
+        If a ``pec_insulator`` boundary is used, this dictionary should contain
+        the associated insulator expressions.
     """
 
     def init(self, kw):
@@ -1010,6 +1015,9 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
 
         # if a thermal boundary is used for particles, get the thermal speeds
         self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
+
+        # get the expressions associated with any pec_insulator boundary
+        self.insulator_expressions = kw.pop("warpx_insulator_expressions", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1080,6 +1088,10 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
         else:
             pywarpx.amr.max_level = 0
 
+        if self.insulator_expressions is not None:
+            for key, expression in self.insulator_expressions.items():
+                pywarpx.insulator.__setattr__(key, expression)
+
 
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
     """
@@ -1116,6 +1128,10 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
         If a thermal boundary is used for particles, this dictionary should
         specify the thermal speed for each species in the form {`<species>`: u_th}.
         Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
+
+    warpx_insulator_expressions: dict, default=None
+        If a ``pec_insulator`` boundary is used, this dictionary should contain
+        the associated insulator expressions.
     """
 
     def init(self, kw):
@@ -1143,6 +1159,9 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
 
         # if a thermal boundary is used for particles, get the thermal speeds
         self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
+
+        # get the expressions associated with any pec_insulator boundary
+        self.insulator_expressions = kw.pop("warpx_insulator_expressions", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1195,6 +1214,10 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
         else:
             pywarpx.amr.max_level = 0
 
+        if self.insulator_expressions is not None:
+            for key, expression in self.insulator_expressions.items():
+                pywarpx.insulator.__setattr__(key, expression)
+
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     """
@@ -1243,6 +1266,10 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         If a thermal boundary is used for particles, this dictionary should
         specify the thermal speed for each species in the form {`<species>`: u_th}.
         Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
+
+    warpx_insulator_expressions: dict, default=None
+        If a ``pec_insulator`` boundary is used, this dictionary should contain
+        the associated insulator expressions.
     """
 
     def init(self, kw):
@@ -1272,6 +1299,9 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
 
         # if a thermal boundary is used for particles, get the thermal speeds
         self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
+
+        # get the expressions associated with any pec_insulator boundary
+        self.insulator_expressions = kw.pop("warpx_insulator_expressions", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1330,6 +1360,10 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
             # The refinement_factor is ignored (assumed to be [2,2])
         else:
             pywarpx.amr.max_level = 0
+
+        if self.insulator_expressions is not None:
+            for key, expression in self.insulator_expressions.items():
+                pywarpx.insulator.__setattr__(key, expression)
 
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
@@ -1391,6 +1425,10 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         If a thermal boundary is used for particles, this dictionary should
         specify the thermal speed for each species in the form {`<species>`: u_th}.
         Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.
+
+    warpx_insulator_expressions: dict, default=None
+        If a ``pec_insulator`` boundary is used, this dictionary should contain
+        the associated insulator expressions.
     """
 
     def init(self, kw):
@@ -1422,6 +1460,9 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 
         # if a thermal boundary is used for particles, get the thermal speeds
         self.thermal_boundary_u_th = kw.pop("warpx_boundary_u_th", None)
+
+        # get the expressions associated with any pec_insulator boundary
+        self.insulator_expressions = kw.pop("warpx_insulator_expressions", None)
 
     def grid_initialize_inputs(self):
         pywarpx.amr.n_cell = self.number_of_cells
@@ -1487,6 +1528,10 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             # The refinement_factor is ignored (assumed to be [2,2,2])
         else:
             pywarpx.amr.max_level = 0
+
+        if self.insulator_expressions is not None:
+            for key, expression in self.insulator_expressions.items():
+                pywarpx.insulator.__setattr__(key, expression)
 
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):

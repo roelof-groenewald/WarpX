@@ -429,7 +429,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.0) && solve_for_Faraday;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity && solve_for_Faraday;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -653,7 +653,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         const Real r = rmin + (i + 0.5_rt)*dr;
                         auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                             + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - Jr(i, j, 0)/(r*r);
-                        Er(i, j, 0) -= eta_h * nabla2Jr;
+                        Er(i, j, 0) -= eta_h(rho_val) * nabla2Jr;
                     }
                 }
 
@@ -711,7 +711,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     if (include_hyper_resistivity_term) {
                         auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
                             + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - Jt(i, j, 0)/(r*r);
-                        Et(i, j, 0) -= eta_h * nabla2Jt;
+                        Et(i, j, 0) -= eta_h(rho_val) * nabla2Jt;
                     }
                 }
 
@@ -768,7 +768,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         if (r > 0.5_rt*dr) {
                             nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                         }
-                        Ez(i, j, 0) -= eta_h * nabla2Jz;
+                        Ez(i, j, 0) -= eta_h(rho_val) * nabla2Jz;
                     }
                 }
 
@@ -812,7 +812,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto rho_floor = hybrid_model->m_n_floor * PhysConst::q_e;
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
 
-    const bool include_hyper_resistivity_term = (eta_h > 0.) && solve_for_Faraday;
+    const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity && solve_for_Faraday;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -1033,7 +1033,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         auto nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
-                        Ex(i, j, k) -= eta_h * nabla2Jx;
+                        Ex(i, j, k) -= eta_h(rho_val) * nabla2Jx;
                     }
                 }
 
@@ -1086,7 +1086,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         auto nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
-                        Ey(i, j, k) -= eta_h * nabla2Jy;
+                        Ey(i, j, k) -= eta_h(rho_val) * nabla2Jy;
                     }
                 }
 
@@ -1139,7 +1139,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         auto nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
                             + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
                             + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
-                        Ez(i, j, k) -= eta_h * nabla2Jz;
+                        Ez(i, j, k) -= eta_h(rho_val) * nabla2Jz;
                     }
                 }
 

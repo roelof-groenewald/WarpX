@@ -104,6 +104,32 @@ struct CylindricalYeeAlgorithm {
         return 1._rt/r * inv_dr*( (r+0.5_rt*dr)*F(i,j,k,comp) - (r-0.5_rt*dr)*F(i-1,j,k,comp) );
     }
 
+    /** Applies the differential operator `d/dr(1/r d(rF)/dr)`,
+     * where `F` is on a cell-centered or a nodal grid in `r`
+     * The input parameter `r` is at the same location as F */
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real DrDrr_over_r (
+        T_Field const& F,
+        amrex::Real const r, amrex::Real const dr,
+        amrex::Real const * const coefs_r, int const n_coefs_r,
+        int const i, int const j, int const k, int const comp ) {
+
+        using namespace amrex;
+
+        Real const inv_dr = coefs_r[0];
+        const auto upward_term = UpwardDrr_over_r(
+                F, r+0.5_rt*dr, dr, coefs_r, n_coefs_r, i, j, k, comp
+            );
+        Real downward_term = 0._rt;
+        if (r > 0.5_rt*dr) {
+            downward_term = DownwardDrr_over_r(
+                F, r-0.5_rt*dr, dr, coefs_r, n_coefs_r, i, j, k, comp
+            );
+        }
+        return inv_dr*(upward_term - downward_term);
+    }
+
     /**
      * Perform derivative along r on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE

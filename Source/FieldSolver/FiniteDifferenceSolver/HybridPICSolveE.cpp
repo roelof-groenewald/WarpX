@@ -651,8 +651,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     if (include_hyper_resistivity_term) {
                         // r on cell-centered point (Jr is cell-centered in r)
                         const Real r = rmin + (i + 0.5_rt)*dr;
-                        auto nabla2Jr = T_Algo::Dr_rDr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
-                            + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0) - Jr(i, j, 0)/(r*r);
+                        auto nabla2Jr = T_Algo::DrDrr_over_r(Jr, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                            + T_Algo::Dzz(Jr, coefs_z, n_coefs_z, i, j, 0, 0);
                         Er(i, j, 0) -= eta_h * nabla2Jr;
                     }
                 }
@@ -709,8 +709,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Et(i, j, 0) += eta(rho_val, jtot_val) * Jt(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
-                        auto nabla2Jt = T_Algo::Dr_rDr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
-                            + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0) - Jt(i, j, 0)/(r*r);
+                        auto nabla2Jt = T_Algo::DrDrr_over_r(Jt, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                            + T_Algo::Dzz(Jt, coefs_z, n_coefs_z, i, j, 0, 0);
                         Et(i, j, 0) -= eta_h * nabla2Jt;
                     }
                 }

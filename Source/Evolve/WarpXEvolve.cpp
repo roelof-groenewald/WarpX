@@ -301,6 +301,13 @@ WarpX::Evolve (int numsteps)
                     lev);
             }
             FillBoundaryB(getngEB(), true);
+            // Apply field boundary conditions so that, at conducting (PEC)
+            // walls, B's guard cells hold the image-symmetry values read by
+            // the Darwin solver's lap(B) source term and by the near-wall
+            // particle field gather. No-op for periodic boundaries.
+            for (int lev = 0; lev <= finestLevel(); ++lev) {
+                ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::None, cur_time);
+            }
         };
 
         // Field solve step for electrostatic, hybrid-PIC, or Darwin solvers

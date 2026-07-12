@@ -1685,6 +1685,16 @@ class GMRESLinearSolver(LinearSolverBase):
 
     absolute_tolerance: float, default=0.
         Absoluate tolerence of the convergence
+
+    warm_start: bool, default=False
+        Whether to use the previous solve's solution as the initial guess of
+        the next solve (currently only used by the semi-implicit Darwin
+        solver). Only beneficial when the source is correlated between steps,
+        which requires resolving the electron gyration (w_ce*dt << 1); with
+        larger time steps the deposited current decorrelates and the warm
+        start slightly increases the iteration count. The convergence bound
+        is unchanged either way: the relative tolerance is applied to the
+        full RHS norm, not the warm-start residual.
     """
 
     def __init__(
@@ -1694,12 +1704,14 @@ class GMRESLinearSolver(LinearSolverBase):
         absolute_tolerance=None,
         relative_tolerance=None,
         max_iterations=None,
+        warm_start=None,
     ):
         self.verbose_int = verbose_int
         self.restart_length = restart_length
         self.absolute_tolerance = absolute_tolerance
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
+        self.warm_start = warm_start
 
     def linear_solver_initialize_inputs(self, nonlinear_solver=None):
         if nonlinear_solver is not None:
@@ -1710,6 +1722,7 @@ class GMRESLinearSolver(LinearSolverBase):
         amrex_gmres.absolute_tolerance = self.absolute_tolerance
         amrex_gmres.relative_tolerance = self.relative_tolerance
         amrex_gmres.max_iterations = self.max_iterations
+        amrex_gmres.warm_start = self.warm_start
 
 
 class PETScKSPLinearSolver(LinearSolverBase):

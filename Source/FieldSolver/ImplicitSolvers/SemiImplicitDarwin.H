@@ -192,6 +192,20 @@ private:
     int m_linsol_restart_length = 30;
     amrex::Real m_linsol_atol = 0.;
     amrex::Real m_linsol_rtol = 1.0e-4;
+
+    /**
+     * \brief Warm start the linear solve with the previous step's Z (off by
+     *  default). Only helps when the source is correlated between steps,
+     *  which requires resolving the electron gyration (w_ce*dt << 1): for
+     *  the CFL-free time steps this solver targets, the gyration content of
+     *  the deposited current decorrelates (w_ce*dt ~ 1 nearly reverses the
+     *  perpendicular velocities), making the previous Z a slightly *worse*
+     *  guess than zero - measured ~15% more GMRES iterations on the 2D
+     *  reconnection setup. The solver's convergence bound is unchanged
+     *  either way (it is measured against the full RHS, not the warm-start
+     *  residual).
+     */
+    bool m_linsol_warm_start = false;
 };
 
 #endif

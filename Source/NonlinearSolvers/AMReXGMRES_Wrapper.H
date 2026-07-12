@@ -11,6 +11,7 @@
 
 #include <AMReX_GMRES.H>
 
+#include <algorithm>
 #include <memory>
 
 /**
@@ -51,6 +52,7 @@ public:
     AMREX_FORCE_INLINE
     void define (Ops& linop) override
     {
+        m_linop = &linop;
         m_solver = std::make_unique<amrex::GMRES<Vec,Ops>>();
         m_solver->define(linop);
     }
@@ -58,7 +60,9 @@ public:
     /**
      * \brief Solve the linear system
      *
-     * \param a_sol     unknowns, i.e., x in A x = b.
+     * \param a_sol     unknowns, i.e., x in A x = b. With warm starting
+     *                  enabled the incoming values are used as the initial
+     *                  guess; otherwise the solve starts from zero.
      * \param a_rhs     RHS, i.e., b in A x = b.
      * \param a_tol_rel relative tolerance.
      * \param a_tol_abs absolute tolerance.
@@ -71,7 +75,27 @@ public:
                 RT a_tol_abs,
                 int a_its=-1) override
     {
-        m_solver->solve(a_sol, a_rhs, a_tol_rel, a_tol_abs, a_its);
+        if (m_warm_start) {
+            // amrex::GMRES zeroes the incoming solution vector, so the warm
+            // start is expressed in residual-correction form: solve
+            // A*delta = b - A*x0 for delta (which correctly starts from
+            // zero) and set x = x0 + delta. The relative tolerance is folded
+            // into the absolute one using ||b|| - rather than the (ideally
+            // much smaller) warm-start residual GMRES would measure against -
+            // so the final residual satisfies the same bound as a cold start:
+            // ||b - A*x|| <= max(a_tol_rel*||b||, a_tol_abs).
+            if (m_residual == nullptr) {
+                m_residual = std::make_unique<Vec>(m_linop->makeVecRHS());
+                m_delta = std::make_unique<Vec>(m_linop->makeVecLHS());
+            }
+            m_linop->apply(*m_residual, a_sol);
+            m_linop->linComb(*m_residual, RT(1.0), a_rhs, RT(-1.0), *m_residual);
+            const RT tol_abs = std::max(a_tol_abs, a_tol_rel*m_linop->norm2(a_rhs));
+            m_solver->solve(*m_delta, *m_residual, RT(0.0), tol_abs, a_its);
+            m_linop->increment(a_sol, *m_delta, RT(1.0));
+        } else {
+            m_solver->solve(a_sol, a_rhs, a_tol_rel, a_tol_abs, a_its);
+        }
     }
 
     //! Sets verbosity.
@@ -81,6 +105,11 @@ public:
     //! Sets restart length. The default is 30.
     AMREX_FORCE_INLINE
     void setRestartLength (int rl) override { m_solver->setRestartLength(rl); }
+
+    //! Enables warm starting (off by default): solve() treats the incoming
+    //! solution vector as an initial guess instead of starting from zero.
+    AMREX_FORCE_INLINE
+    void setWarmStart (bool ws) override { m_warm_start = ws; }
 
     //! Sets the max number of iterations
     AMREX_FORCE_INLINE
@@ -100,6 +129,17 @@ public:
 
 private:
     std::unique_ptr<amrex::GMRES<Vec,Ops>> m_solver = nullptr;
+
+    //! Non-owning pointer to the linear operator passed to define(); used to
+    //! form the warm-start residual b - A*x0.
+    Ops* m_linop = nullptr;
+
+    bool m_warm_start = false;
+
+    //! Persistent scratch vectors for the warm-start residual-correction
+    //! solve, allocated on first use.
+    std::unique_ptr<Vec> m_residual = nullptr;
+    std::unique_ptr<Vec> m_delta = nullptr;
 };
 
 #endif

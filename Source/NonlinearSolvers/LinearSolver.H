@@ -58,6 +58,11 @@ public:
     //! provided for solvers that don't need this.
     virtual void setRestartLength (int rl) { amrex::ignore_unused(rl); }
 
+    //! Enables warm starting: solve() treats the incoming solution vector as
+    //! an initial guess instead of starting from zero. Base implementation
+    //! provided for solvers that don't support this.
+    virtual void setWarmStart (bool ws) { amrex::ignore_unused(ws); }
+
     //! Sets the max number of iterations
     virtual void setMaxIters (int niters) = 0;
 

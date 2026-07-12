@@ -158,6 +158,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("absolute_tolerance",  m_linsol_atol);
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
+    pp_l.query("warm_start",          m_linsol_warm_start);
 
     // Multiplier on the grad-div (Coulomb-gauge penalty) stabilization
     // coefficient (see AddGradDivZTerm); 0 disables the term.
@@ -183,6 +184,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setVerbose( m_linsol_verbose_int );
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
+    m_linear_solver->setWarmStart( m_linsol_warm_start );
 
     // Initialize the mass matrices for plasma response
     InitializeMassMatrices();
@@ -205,6 +207,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+    amrex::Print()     << "Linear solver (" << linsol_name << ") warm start:         " << (m_linsol_warm_start ? "true" : "false") << "\n";
     amrex::Print()     << "Grad-div (gauge penalty) factor:                    " << m_graddiv_factor << "\n";
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -264,7 +267,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // conducting (PEC) walls: the wall-normal rows of the projected system
     // have identically zero residual, so a nonzero wall value in the initial
     // guess would persist through the solve and contaminate dA at the wall.
-    ApplyPECtoZ(m_Z.getArrayVec()[0], 0, amrex::IntVect(0));
+    // Without warm starting the solve discards the initial guess, so there
+    // is nothing to project.
+    if (m_linsol_warm_start) {
+        ApplyPECtoZ(m_Z.getArrayVec()[0], 0, amrex::IntVect(0));
+    }
 
     // Solve MS equation
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);

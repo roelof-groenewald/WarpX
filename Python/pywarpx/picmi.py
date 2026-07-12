@@ -1695,6 +1695,11 @@ class GMRESLinearSolver(LinearSolverBase):
         start slightly increases the iteration count. The convergence bound
         is unchanged either way: the relative tolerance is applied to the
         full RHS norm, not the warm-start residual.
+
+    pc_type: preconditioner instance, optional
+        The preconditioner applied inside the GMRES iterations (currently
+        only used by the semi-implicit Darwin solver, which supports an
+        instance of DarwinMLMGPreconditioner).
     """
 
     def __init__(
@@ -1705,6 +1710,7 @@ class GMRESLinearSolver(LinearSolverBase):
         relative_tolerance=None,
         max_iterations=None,
         warm_start=None,
+        pc_type=None,
     ):
         self.verbose_int = verbose_int
         self.restart_length = restart_length
@@ -1712,6 +1718,10 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
         self.warm_start = warm_start
+        self.pc_type = pc_type
+
+        if pc_type is not None:
+            assert isinstance(pc_type, PreconditionerBase)
 
     def linear_solver_initialize_inputs(self, nonlinear_solver=None):
         if nonlinear_solver is not None:
@@ -1723,6 +1733,10 @@ class GMRESLinearSolver(LinearSolverBase):
         amrex_gmres.relative_tolerance = self.relative_tolerance
         amrex_gmres.max_iterations = self.max_iterations
         amrex_gmres.warm_start = self.warm_start
+
+        if self.pc_type is not None:
+            amrex_gmres.pc_type = self.pc_type.name
+            self.pc_type.preconditioner_type_initialize_inputs()
 
 
 class PETScKSPLinearSolver(LinearSolverBase):
@@ -1800,6 +1814,76 @@ class CurlCurlMLMGPreconditioner(PreconditionerBase):
         pc_curl_curl_mlmg.max_coarsening_level = self.max_coarsening_level
         pc_curl_curl_mlmg.relative_tolerance = self.relative_tolerance
         pc_curl_curl_mlmg.absolute_tolerance = self.absolute_tolerance
+
+
+class DarwinMLMGPreconditioner(PreconditionerBase):
+    """
+    Sets up the factored-Laplacian multigrid preconditioner for the
+    semi-implicit Darwin solver's GMRES iteration. Approximates the Darwin
+    field operator by its constant-susceptibility factorization
+    (-nabla^2)(-nabla^2 + chi) and applies it as two successive scalar
+    multigrid solves (Poisson then Helmholtz with the spatially varying
+    susceptibility) per vector component.
+
+    Parameters
+    ----------
+    verbose: bool, default=False
+        Whether there is verbose output from the solver
+
+    bottom_verbose: bool, optional
+        Whether there is verbose output from the bottom solver
+
+    agglomeration: bool, optional
+
+    consolidation: bool, optional
+
+    max_iter: int, default=2
+        The fixed number of V-cycles used for each of the two multigrid
+        solves per component (fixed so the preconditioner is a fixed linear
+        operator across a GMRES solve)
+
+    max_coarsening_level: int, optional
+        Maximum coarsening level
+
+    relative_tolerance: float, optional
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, optional
+        Absolute tolerance of the convergence
+    """
+
+    name = "pc_darwin_mlmg"
+
+    def __init__(
+        self,
+        verbose=None,
+        bottom_verbose=None,
+        agglomeration=None,
+        consolidation=None,
+        max_iter=None,
+        max_coarsening_level=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
+    ):
+        self.verbose = verbose
+        self.bottom_verbose = bottom_verbose
+        self.agglomeration = agglomeration
+        self.consolidation = consolidation
+        self.max_iter = max_iter
+        self.max_coarsening_level = max_coarsening_level
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+
+    def preconditioner_type_initialize_inputs(self):
+        pc_darwin_mlmg = pywarpx.warpx.get_bucket("pc_darwin_mlmg")
+        pc_darwin_mlmg.verbose = self.verbose
+        pc_darwin_mlmg.bottom_verbose = self.bottom_verbose
+        pc_darwin_mlmg.agglomeration = self.agglomeration
+        pc_darwin_mlmg.consolidation = self.consolidation
+        pc_darwin_mlmg.max_iter = self.max_iter
+        pc_darwin_mlmg.max_coarsening_level = self.max_coarsening_level
+        pc_darwin_mlmg.relative_tolerance = self.relative_tolerance
+        pc_darwin_mlmg.absolute_tolerance = self.absolute_tolerance
 
 
 class JacobiPreconditioner(PreconditionerBase):

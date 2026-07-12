@@ -116,6 +116,19 @@ public:
      */
     void ProjectOutNullConstants ( const ablastr::fields::VectorField& a_field );
 
+    /**
+     * \brief Fill a cell-centered MultiFab with the scalar susceptibility
+     *  chi(x): the (2 mu0/dt)-scaled row-sum of the diagonal mass-matrix
+     *  bands, averaged over the three diagonal blocks and interpolated from
+     *  their native (E-type) staggering to cell centers. This is the local
+     *  chi scale the curl(chi curl Z) operator term applies to a uniform dA
+     *  (the same quantity whose domain mean sets the grad-div penalty
+     *  coefficient), used by the pc_darwin_mlmg preconditioner's Helmholtz
+     *  factor. Must be called after the mass matrices have been deposited
+     *  and synced for the current step.
+     */
+    void ComputeSusceptibilityCC ( amrex::MultiFab& a_chi_cc ) const;
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -206,6 +219,13 @@ private:
      *  residual).
      */
     bool m_linsol_warm_start = false;
+
+    /**
+     * \brief Preconditioner for the GMRES solve (amrex_gmres.pc_type; off by
+     *  default). Only PreconditionerType::pc_darwin_mlmg is supported: the
+     *  factored-Laplacian MLMG preconditioner (see DarwinMLMGPC.H).
+     */
+    PreconditionerType m_pc_type = PreconditionerType::none;
 };
 
 #endif

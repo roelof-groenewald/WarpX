@@ -159,6 +159,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
     pp_l.query("warm_start",          m_linsol_warm_start);
+    pp_l.query("pc_type",             m_pc_type);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_type == PreconditionerType::none ||
+        m_pc_type == PreconditionerType::pc_darwin_mlmg,
+        "The semi-implicit Darwin solver only supports pc_darwin_mlmg as "
+        "the GMRES preconditioner (amrex_gmres.pc_type).");
 
     // Multiplier on the grad-div (Coulomb-gauge penalty) stabilization
     // coefficient (see AddGradDivZTerm); 0 disables the term.
@@ -173,7 +179,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // write ComputeRHS appropriately, this will add some extra overhead in MF operations
     // but would reduce code.
     m_linear_function = std::make_unique<LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>>();
-    m_linear_function->define(m_Z, this, PreconditionerType::none);
+    m_linear_function->define(m_Z, this, m_pc_type);
 
     // Define the nonlinear solver
     // m_nlsolver->Define(m_dA, this);
@@ -208,7 +214,9 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") warm start:         " << (m_linsol_warm_start ? "true" : "false") << "\n";
+    amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
     amrex::Print()     << "Grad-div (gauge penalty) factor:                    " << m_graddiv_factor << "\n";
+    m_linear_function->printParams();
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
@@ -262,6 +270,10 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Populate the source vector
     CalculateSourceVector();
+
+    // Refresh the preconditioner from the freshly deposited mass matrices
+    // (no-op unless a preconditioner is enabled).
+    m_linear_function->updatePreCondMat(m_Z);
 
     // Project the warm-start initial guess (the previous step's Z) at
     // conducting (PEC) walls: the wall-normal rows of the projected system
@@ -1410,5 +1422,62 @@ void SemiImplicitDarwin::ProjectOutNullConstants ( const ablastr::fields::Vector
         const amrex::Real mean =
             mf.sum(0, false) / static_cast<amrex::Real>(mf.boxArray().numPts());
         mf.plus(-mean, 0, 1, 0);
+    }
+}
+
+void SemiImplicitDarwin::ComputeSusceptibilityCC ( amrex::MultiFab& a_chi_cc ) const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeSusceptibilityCC()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+
+    a_chi_cc.setVal(0.0);
+
+    // Average over the three diagonal blocks and scale by the same 2 mu0/dt
+    // prefactor the operator applies to the mass-matrix product.
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / (3.0_rt * m_dt);
+
+    for (int d = 0; d < 3; ++d) {
+        const int nc = Sdiag[d]->nComp();
+        const amrex::IntVect et = Sdiag[d]->ixType().toIntVect();
+        int e[3] = {0, 0, 0};
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) { e[idim] = et[idim]; }
+        const int e0 = e[0];
+        const int e1 = e[1];
+        const int e2 = e[2];
+        // Each staggered point contributes with equal weight to the average
+        // onto the cell center (2 points per nodal dimension of the block).
+        const amrex::Real wt =
+            fac / static_cast<amrex::Real>((e0 + 1)*(e1 + 1)*(e2 + 1));
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(a_chi_cc, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& tbx = mfi.tilebox();
+            amrex::Array4<amrex::Real> const& chi = a_chi_cc.array(mfi);
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real s = 0.0;
+                for (int c = 0; c < nc; ++c) {
+                    for (int kk = 0; kk <= e2; ++kk) {
+                        for (int jj = 0; jj <= e1; ++jj) {
+                            for (int ii = 0; ii <= e0; ++ii) {
+                                s += S(i+ii,j+jj,k+kk,c);
+                            }
+                        }
+                    }
+                }
+                chi(i,j,k) += wt*s;
+            });
+        }
     }
 }

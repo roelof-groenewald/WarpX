@@ -11,6 +11,7 @@
 
 #include "LinearFunction.H"
 #include "CurlCurlMLMGPC.H"
+#include "DarwinMLMGPC.H"
 #include "MatrixPC.H"
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
@@ -161,6 +162,8 @@ void LinearFunctionMF<T,Ops>::define ( const T& a_U,
         m_pc_type = a_pc_type;
         if (m_pc_type == PreconditionerType::pc_curl_curl_mlmg) {
             m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
+        } else if (m_pc_type == PreconditionerType::pc_darwin_mlmg) {
+            m_preCond = std::make_unique<DarwinMLMGPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_jacobi) {
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
         } else {

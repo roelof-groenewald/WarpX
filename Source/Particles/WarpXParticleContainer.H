@@ -661,6 +661,13 @@ public:
         return (pos != int_names.end());
     }
 
+    bool HasRealAttrib (const std::string& name)
+    {
+        std::vector<std::string> const & real_names = GetRealSoANames();
+        auto const pos = std::find(real_names.begin(), real_names.end(), name);
+        return (pos != real_names.end());
+    }
+
     std::string const & getName() { return species_name; }
 
 protected:

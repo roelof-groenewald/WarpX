@@ -887,9 +887,13 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         xyzmin, lo, q, WarpX::n_rz_azimuthal_modes);
                 }
             } else if (push_type == PushType::Implicit) {
-                auto& uxp_n = pti.GetAttribs("ux_n");
-                auto& uyp_n = pti.GetAttribs("uy_n");
-                auto& uzp_n = pti.GetAttribs("uz_n");
+                // The nonlinear implicit solvers save the step-start velocity
+                // in "ux_n", ...; the semi-implicit Darwin solver saves its
+                // second velocity sample in "ux_save", ...
+                const bool has_u_n = HasRealAttrib("ux_n");
+                auto& uxp_n = pti.GetAttribs(has_u_n ? "ux_n" : "ux_save");
+                auto& uyp_n = pti.GetAttribs(has_u_n ? "uy_n" : "uy_save");
+                auto& uzp_n = pti.GetAttribs(has_u_n ? "uz_n" : "uz_save");
                 if        (WarpX::nox == 1){
                     doDepositionShapeNImplicit<1>(
                         GetPosition, wp.dataPtr() + offset,
@@ -1153,9 +1157,13 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     const amrex::ParticleReal By_ext = m_B_external_particle[1];
     const amrex::ParticleReal Bz_ext = m_B_external_particle[2];
 
-    auto& uxp_n = pti.GetAttribs("ux_n");
-    auto& uyp_n = pti.GetAttribs("uy_n");
-    auto& uzp_n = pti.GetAttribs("uz_n");
+    // The nonlinear implicit solvers save the step-start velocity in "ux_n",
+    // ...; the semi-implicit Darwin solver saves its second velocity sample
+    // in "ux_save", ...
+    const bool has_u_n = HasRealAttrib("ux_n");
+    auto& uxp_n = pti.GetAttribs(has_u_n ? "ux_n" : "ux_save");
+    auto& uyp_n = pti.GetAttribs(has_u_n ? "uy_n" : "uy_save");
+    auto& uzp_n = pti.GetAttribs(has_u_n ? "uz_n" : "uz_save");
 
     const bool full_mass_matrices = (Szz->nComp() > 1);
 

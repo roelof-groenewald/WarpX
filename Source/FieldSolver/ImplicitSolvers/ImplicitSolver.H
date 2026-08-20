@@ -54,7 +54,13 @@ public:
 
     virtual void PrintParameters () const = 0;
 
-    void CreateParticleAttributes () const;
+    /**
+     * \brief Add the runtime particle components needed by the solver: the
+     * particle positions and velocities at the start of the time step
+     * ("x_n", ..., "ux_n", ...). Solvers that need different components
+     * (e.g., SemiImplicitDarwin) can override this function.
+     */
+    virtual void CreateParticleAttributes () const;
 
     bool DoParticleSuborbits () const { return m_particle_suborbits; }
 

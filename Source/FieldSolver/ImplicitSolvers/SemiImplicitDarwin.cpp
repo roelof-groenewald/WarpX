@@ -37,6 +37,14 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
             "conditions in all directions.");
     }
 
+    // This solver deposits current with fixed particle positions (particles
+    // are only pushed after the field solve), so the segment-based Villasenor
+    // deposition is not meaningful here, and its kernels read saved positions
+    // ("x_n", ...) that this solver does not allocate.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct,
+        "The semi-implicit Darwin solver requires algo.current_deposition = direct");
+
     // Define dA MultiFabs
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -108,6 +116,24 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
+void SemiImplicitDarwin::CreateParticleAttributes () const
+{
+    // Set comm to false so that the attributes are not communicated
+    // nor written to the checkpoint files
+    int const comm = 0;
+
+    // Add space to save a velocity sample on each particle. Over the course
+    // of OneStep() this scratch attribute successively holds u^{n-1/2}
+    // (saved by SaveParticleVelocities() at the start of the step) and then
+    // the velocity advanced with only the electrostatic field (saved by
+    // PrepareVelocitiesForCurrentDeposition()).
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+        pc->AddRealComp("ux_save", comm);
+        pc->AddRealComp("uy_save", comm);
+        pc->AddRealComp("uz_save", comm);
+    }
+}
+
 int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
                                                    amrex::Real  a_dt,
                                                    int          a_step )
@@ -124,9 +150,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Fields have E^{n} (from phi^n only), B^{n-1/2}
     // Particles have u^{n-1/2} and x^{n}.
 
-    // Save u and x at the start of the time step
-    // TODO: only save u since we don't need to keep x
-    m_WarpX->SaveParticlesAtImplicitStepStart();
+    // Save u^{n-1/2} at the start of the time step (positions do not need to
+    // be saved since particles are only pushed after the field solve)
+    SaveParticleVelocities();
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
     // the E-field was cleared during the last Poisson solve)
@@ -147,7 +173,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Prepare current deposition: the velocities are time centered with
     // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
-    // for the advanced velocity), and the advanced velocity is saved to u_n
+    // for the advanced velocity), and the advanced velocity is saved to u_save
     PrepareVelocitiesForCurrentDeposition();
 
     // Accumulate current* and the mass matrices
@@ -228,19 +254,57 @@ void SemiImplicitDarwin::ComputeRHS ( [[maybe_unused]] WarpXSolverVec& a_RHS,
         "Darwin solver is linear and uses DarwinLinearFieldOperator::apply() instead.");
 }
 
+void SemiImplicitDarwin::SaveParticleVelocities ()
+{
+    BL_PROFILE("SemiImplicitDarwin::SaveParticleVelocities()");
+    // Copy the current particle velocities (u^{n-1/2}) into the u_save
+    // scratch attributes
+
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+
+        // for (int lev = 0; lev <= finest_level; ++lev)
+        const int lev = 0;
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+
+                auto& attribs = pti.GetAttribs();
+                amrex::ParticleReal const* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                amrex::ParticleReal const* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                amrex::ParticleReal const* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+                amrex::ParticleReal* ux_save = pti.GetAttribs("ux_save").dataPtr();
+                amrex::ParticleReal* uy_save = pti.GetAttribs("uy_save").dataPtr();
+                amrex::ParticleReal* uz_save = pti.GetAttribs("uz_save").dataPtr();
+
+                const long np = pti.numParticles();
+
+                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+                {
+                    ux_save[ip] = ux[ip];
+                    uy_save[ip] = uy[ip];
+                    uz_save[ip] = uz[ip];
+                });
+            }
+        }
+    }
+}
+
 void SemiImplicitDarwin::PrepareVelocitiesForCurrentDeposition ()
 {
     BL_PROFILE("SemiImplicitDarwin::PrepareVelocitiesForCurrentDeposition()");
     // On entry, u holds the velocity after the electrostatic-only push
-    // (PushP in OneStep()) and u_n holds the velocity saved at the start of
-    // the step (SaveParticlesAtImplicitStepStart()). This function sets u to
+    // (PushP in OneStep()) and u_save holds u^{n-1/2}, saved at the start of
+    // the step (SaveParticleVelocities()). This function sets u to
     // the time-centered average of the two, which is what
     // GetImplicitGammaInverse() and setMassMatricesKernels() (shared with
     // the electromagnetic implicit schemes) expect as the deposition-time
     // velocity to compute a correct relativistic gamma factor from.
-    // u_n is left holding the electrostatic-only velocity (the u value at the
-    // start of this function) rather than the step-start value, since
-    // FinishVelocityUpdate() later reads u_n to recombine the electrostatic
+    // u_save is left holding the electrostatic-only velocity (the u value at
+    // the start of this function) rather than the step-start value, since
+    // FinishVelocityUpdate() later reads u_save to recombine the electrostatic
     // and inductive velocity contributions; GetImplicitGammaInverse()'s
     // reconstruction is symmetric under swapping which of the two sampled
     // velocities is treated as "u_n" vs "u_nph", so this substitution does
@@ -263,25 +327,25 @@ void SemiImplicitDarwin::PrepareVelocitiesForCurrentDeposition ()
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+                amrex::ParticleReal* ux_save = pti.GetAttribs("ux_save").dataPtr();
+                amrex::ParticleReal* uy_save = pti.GetAttribs("uy_save").dataPtr();
+                amrex::ParticleReal* uz_save = pti.GetAttribs("uz_save").dataPtr();
 
                 const long np = pti.numParticles();
 
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
                 {
                     const amrex::ParticleReal ux_es = ux[ip];
-                    ux[ip] = 0.5_prt*(ux_es + ux_n[ip]);
-                    ux_n[ip] = ux_es;
+                    ux[ip] = 0.5_prt*(ux_es + ux_save[ip]);
+                    ux_save[ip] = ux_es;
 
                     const amrex::ParticleReal uy_es = uy[ip];
-                    uy[ip] = 0.5_prt*(uy_es + uy_n[ip]);
-                    uy_n[ip] = uy_es;
+                    uy[ip] = 0.5_prt*(uy_es + uy_save[ip]);
+                    uy_save[ip] = uy_es;
 
                     const amrex::ParticleReal uz_es = uz[ip];
-                    uz[ip] = 0.5_prt*(uz_es + uz_n[ip]);
-                    uz_n[ip] = uz_es;
+                    uz[ip] = 0.5_prt*(uz_es + uz_save[ip]);
+                    uz_save[ip] = uz_es;
                 });
             }
         }
@@ -459,7 +523,7 @@ void SemiImplicitDarwin::ClearParticleVelocities ()
     BL_PROFILE("SemiImplicitDarwin::ClearParticleVelocities()");
     // This function sets the particle velocities to zero since the "corrector"
     // velocity push only calculate the velocity due to acceleration from
-    // the inductive E-field. The actual velocities are still stored in u_n.
+    // the inductive E-field. The actual velocities are still stored in u_save.
 
     for (auto const& pc : m_WarpX->GetPartContainer()) {
 
@@ -495,7 +559,7 @@ void SemiImplicitDarwin::FinishVelocityUpdate ()
 {
     BL_PROFILE("SemiImplicitDarwin::FinishVelocityUpdate()");
     // This function sets the particle velocities to include the acceleration
-    // from both the electrostatic field (currently held in u_n) and the
+    // from both the electrostatic field (currently held in u_save) and the
     // inductive field (currently held in u)
 
     for (auto const& pc : m_WarpX->GetPartContainer()) {
@@ -515,17 +579,17 @@ void SemiImplicitDarwin::FinishVelocityUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+                amrex::ParticleReal* ux_save = pti.GetAttribs("ux_save").dataPtr();
+                amrex::ParticleReal* uy_save = pti.GetAttribs("uy_save").dataPtr();
+                amrex::ParticleReal* uz_save = pti.GetAttribs("uz_save").dataPtr();
 
                 const long np = pti.numParticles();
 
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
                 {
-                    ux[ip] += ux_n[ip];
-                    uy[ip] += uy_n[ip];
-                    uz[ip] += uz_n[ip];
+                    ux[ip] += ux_save[ip];
+                    uy[ip] += uy_save[ip];
+                    uz[ip] += uz_save[ip];
                 });
             }
         }

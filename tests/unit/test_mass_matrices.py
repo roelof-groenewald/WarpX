@@ -123,9 +123,6 @@ def test_mass_matrices_match_push_and_deposit(particle_shape, sync_scheme):
             grid=sim.solver.grid, method="Multigrid", required_precision=1e-6
         )
     else:
-        # WarpX::electrostatic_solver_id is a static that outlives a simulation
-        # run earlier in this process, so reset it explicitly
-        pywarpx.warpx.do_electrostatic = "none"
         sim.evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(
             nonlinear_solver=picmi.NewtonNonlinearSolver(
                 linear_solver=picmi.GMRESLinearSolver(),

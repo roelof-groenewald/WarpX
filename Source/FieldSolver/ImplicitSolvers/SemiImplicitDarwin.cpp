@@ -16,6 +16,37 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
+namespace
+{
+    /**
+     * \brief Temporarily set the global particle shape (WarpX::nox, noy, noz)
+     *  to the shape used for the magnetostatic part of the Darwin solve, and
+     *  restore algo.particle_shape when the object goes out of scope.
+     */
+    struct ScopedMagnetostaticShape
+    {
+        explicit ScopedMagnetostaticShape (int ms_particle_shape)
+            : m_nox{WarpX::nox}, m_noy{WarpX::noy}, m_noz{WarpX::noz}
+        {
+            WarpX::nox = ms_particle_shape;
+            WarpX::noy = ms_particle_shape;
+            WarpX::noz = ms_particle_shape;
+        }
+        ~ScopedMagnetostaticShape ()
+        {
+            WarpX::nox = m_nox;
+            WarpX::noy = m_noy;
+            WarpX::noz = m_noz;
+        }
+        ScopedMagnetostaticShape (const ScopedMagnetostaticShape&) = delete;
+        ScopedMagnetostaticShape& operator= (const ScopedMagnetostaticShape&) = delete;
+        ScopedMagnetostaticShape (ScopedMagnetostaticShape&&) = delete;
+        ScopedMagnetostaticShape& operator= (ScopedMagnetostaticShape&&) = delete;
+
+        int m_nox, m_noy, m_noz;
+    };
+}
+
 void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 {
     amrex::ignore_unused(from_restart);
@@ -58,6 +89,14 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_source.Define(m_Z);
     m_source.zero();
 
+    // Particle shape used for the magnetostatic part of the solve (current and
+    // mass matrices deposition, inductive E-field gather, and B-field gather).
+    const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
+    pp_implicit_evolve.query("ms_particle_shape", m_ms_particle_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_ms_particle_shape >= 1 && m_ms_particle_shape <= WarpX::nox,
+        "implicit_evolve.ms_particle_shape must be between 1 and algo.particle_shape");
+
     // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
@@ -94,8 +133,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
-    // Initialize the mass matrices for plasma response
-    InitializeMassMatrices();
+    // Initialize the mass matrices for plasma response (their stencil width
+    // is set by the magnetostatic particle shape)
+    {
+        const ScopedMagnetostaticShape ms_shape(m_ms_particle_shape);
+        InitializeMassMatrices();
+    }
 
     // The predictor velocity push in OneStep() gathers the electrostatic E-field
     // with the Galerkin scheme, i.e. with the same shape-factor order used for the
@@ -128,6 +171,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
+    amrex::Print()     << "Magnetostatic particle shape:                  " << m_ms_particle_shape << "\n";
     if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -155,9 +199,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
     // the E-field was cleared during the last Poisson solve). E is gathered with the
-    // Galerkin scheme (unless the user explicitly requested momentum-conserving
-    // gathering - see the warning issued in Define()). B is gathered exactly as in the
-    // corrector push and the mass matrices below.
+    // Galerkin scheme (unless the user explicitly requested momentum-conserving gathering),
+    // with the electrostatic particle shape. B is gathered exactly as in the corrector push
+    // and the mass matrices below, i.e., with the magnetostatic particle shape.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushPDarwin(
@@ -170,7 +214,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
             /*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
-            /*b_shape=*/WarpX::nox
+            /*b_shape=*/m_ms_particle_shape
         );
     }
 
@@ -179,8 +223,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // for the advanced velocity), and the advanced velocity is saved to u_n
     PrepareVelocitiesForCurrentDeposition();
 
-    // Accumulate current* and the mass matrices
-    AccumulateCurrentAndMassMatrices();
+    // Accumulate current* and the mass matrices (with the magnetostatic shape)
+    {
+        const ScopedMagnetostaticShape ms_shape(m_ms_particle_shape);
+        AccumulateCurrentAndMassMatrices();
+    }
 
     // Python callback insertion
     ExecutePythonCallback("afterdeposition");
@@ -218,9 +265,10 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     ClearParticleVelocities();
 
     // Push particle velocities (E-field now only includes the inductive component).
-    // E and B are gathered without order reduction, as the mass matrices assume: the
-    // E gather is then the transpose of the (direct) current deposition, and B is the
-    // same as in the predictor push and the mass matrices.
+    // E and B are gathered with the magnetostatic particle shape and without order
+    // reduction, as the mass matrices assume: the E gather is then the transpose of the
+    // (direct) current deposition, and B is the same as in the predictor push and the
+    // mass matrices.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushPDarwin(
@@ -232,7 +280,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            /*e_shape=*/WarpX::nox, /*e_galerkin=*/false, /*b_shape=*/WarpX::nox
+            /*e_shape=*/m_ms_particle_shape, /*e_galerkin=*/false,
+            /*b_shape=*/m_ms_particle_shape
         );
     }
 

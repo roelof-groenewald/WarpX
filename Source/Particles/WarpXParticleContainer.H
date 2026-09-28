@@ -265,6 +265,26 @@ public:
         amrex::ignore_unused(fields,lev,dt);
     }
 
+    /**
+     * \brief Push the particle momenta by dt for the semi-implicit Darwin solver.
+     *
+     * Unlike PushP, the field gather orders are set explicitly: E is gathered with
+     * shape order e_shape and, if e_galerkin is true, one order lower along each
+     * component's own direction (i.e. the Galerkin scheme on the Yee grid); B is
+     * gathered with shape order b_shape and no order reduction, which is exactly how
+     * the mass matrices gather B. The predictor and corrector velocity pushes of the
+     * Darwin scheme must rotate the velocities with the same B for their sum to be
+     * a single Boris push.
+     */
+    virtual void PushPDarwin (int lev, amrex::Real dt,
+                              const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,
+                              const amrex::MultiFab& Ez, const amrex::MultiFab& Bx,
+                              const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                              int e_shape, bool e_galerkin, int b_shape)
+    {
+        amrex::ignore_unused(lev, dt, Ex, Ey, Ez, Bx, By, Bz, e_shape, e_galerkin, b_shape);
+    }
+
     virtual void PostRestart () = 0;
 
     virtual void AllocData ();

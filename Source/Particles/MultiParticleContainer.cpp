@@ -561,6 +561,17 @@ MultiParticleContainer::PushP (int lev, Real dt,
     }
 }
 
+void
+MultiParticleContainer::PushPDarwin (int lev, Real dt,
+                                     const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
+                                     const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                     int e_shape, bool e_galerkin, int b_shape)
+{
+    for (auto& pc : allcontainers) {
+        pc->PushPDarwin(lev, dt, Ex, Ey, Ez, Bx, By, Bz, e_shape, e_galerkin, b_shape);
+    }
+}
+
 std::unique_ptr<MultiFab>
 MultiParticleContainer::GetZeroChargeDensity (const int lev)
 {

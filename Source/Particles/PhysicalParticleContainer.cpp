@@ -1199,6 +1199,64 @@ PhysicalParticleContainer::SplitParticles (int lev)
     addParticles(pctmp_split,local_flag);
 }
 
+namespace
+{
+    /**
+     * \brief Gather a vector field F at the particle position with shape order
+     *  \p order, optionally one order lower along each component's own direction
+     *  (\p reduce_para), for the semi-implicit Darwin pushes.
+     *
+     *  On the Yee grid, the reduced order is the Galerkin scheme used for E by
+     *  doGatherShapeN; without it, this is the gather the mass matrices use for B.
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void doDarwinGatherVectorField (
+        int order, bool reduce_para,
+        amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+        amrex::ParticleReal& Fxp, amrex::ParticleReal& Fyp, amrex::ParticleReal& Fzp,
+        amrex::Array4<amrex::Real const> const& Fx_arr,
+        amrex::Array4<amrex::Real const> const& Fy_arr,
+        amrex::Array4<amrex::Real const> const& Fz_arr,
+        amrex::IndexType Fx_type, amrex::IndexType Fy_type, amrex::IndexType Fz_type,
+        const amrex::XDim3& dinv, const amrex::XDim3& xyzmin, const amrex::Dim3& lo,
+        int n_rz_azimuthal_modes)
+    {
+        if (order == 1) {
+            if (reduce_para) {
+                doDirectGatherVectorField<1,0>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            } else {
+                doDirectGatherVectorField<1,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            }
+        } else if (order == 2) {
+            if (reduce_para) {
+                doDirectGatherVectorField<2,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            } else {
+                doDirectGatherVectorField<2,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            }
+        } else if (order == 3) {
+            if (reduce_para) {
+                doDirectGatherVectorField<3,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            } else {
+                doDirectGatherVectorField<3,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            }
+        } else if (order == 4) {
+            if (reduce_para) {
+                doDirectGatherVectorField<4,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            } else {
+                doDirectGatherVectorField<4,4>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+            }
+        }
+    }
+}
+
 void
 PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
@@ -1336,6 +1394,149 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     amrex::ParticleReal qp = q;
                     if (ion_lev){ qp *= ion_lev[ip]; }
+                    UpdateMomentumHigueraCary( ux[ip], uy[ip], uz[ip],
+                                               Exp, Eyp, Ezp, Bxp,
+                                               Byp, Bzp, qp, mass, dt);
+                } else {
+                    amrex::Abort("Unknown particle pusher");
+                }
+            });
+        }
+    }
+}
+
+void
+PhysicalParticleContainer::PushPDarwin (int lev, Real dt,
+                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
+                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                        int e_shape, bool e_galerkin, int b_shape)
+{
+    ABLASTR_PROFILE("PhysicalParticleContainer::PushPDarwin()");
+
+    if (do_not_push) { return; }
+
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(lev,0));
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+    {
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            amrex::Box box = pti.tilebox();
+            box.grow(Ex.nGrowVect());
+
+            const long np = pti.numParticles();
+
+            // Data on the grid
+            const FArrayBox& exfab = Ex[pti];
+            const FArrayBox& eyfab = Ey[pti];
+            const FArrayBox& ezfab = Ez[pti];
+            const FArrayBox& bxfab = Bx[pti];
+            const FArrayBox& byfab = By[pti];
+            const FArrayBox& bzfab = Bz[pti];
+
+            const auto getPosition = GetParticlePosition<PIdx>(pti);
+
+            const auto getExternalEB = GetExternalEBField(pti);
+
+            const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
+            const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
+            const amrex::ParticleReal Ez_external_particle = m_E_external_particle[2];
+            const amrex::ParticleReal Bx_external_particle = m_B_external_particle[0];
+            const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
+            const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
+
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+
+            const Dim3 lo = lbound(box);
+
+            const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
+
+            amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
+            amrex::Array4<const amrex::Real> const& ey_arr = eyfab.array();
+            amrex::Array4<const amrex::Real> const& ez_arr = ezfab.array();
+            amrex::Array4<const amrex::Real> const& bx_arr = bxfab.array();
+            amrex::Array4<const amrex::Real> const& by_arr = byfab.array();
+            amrex::Array4<const amrex::Real> const& bz_arr = bzfab.array();
+
+            amrex::IndexType const ex_type = exfab.box().ixType();
+            amrex::IndexType const ey_type = eyfab.box().ixType();
+            amrex::IndexType const ez_type = ezfab.box().ixType();
+            amrex::IndexType const bx_type = bxfab.box().ixType();
+            amrex::IndexType const by_type = byfab.box().ixType();
+            amrex::IndexType const bz_type = bzfab.box().ixType();
+
+            auto& attribs = pti.GetAttribs();
+            ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+            ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+            ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+            int* AMREX_RESTRICT ion_lev = nullptr;
+            if (do_field_ionization) {
+                ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
+            }
+
+            // Loop over the particles and update their momentum
+            const amrex::ParticleReal q = this->m_charge;
+            const amrex::ParticleReal mass = this->m_mass;
+
+            const auto pusher_algo = WarpX::particle_pusher_algo;
+            const auto do_crr = do_classical_radiation_reaction;
+
+            const auto t_do_not_gather = do_not_gather;
+
+            enum exteb_flags : int { no_exteb, has_exteb };
+
+            const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+
+            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
+                               {exteb_runtime_flag},
+                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
+            {
+                amrex::ParticleReal xp, yp, zp;
+                getPosition(ip, xp, yp, zp);
+
+                amrex::ParticleReal Exp = Ex_external_particle;
+                amrex::ParticleReal Eyp = Ey_external_particle;
+                amrex::ParticleReal Ezp = Ez_external_particle;
+                amrex::ParticleReal Bxp = Bx_external_particle;
+                amrex::ParticleReal Byp = By_external_particle;
+                amrex::ParticleReal Bzp = Bz_external_particle;
+
+                if (!t_do_not_gather){
+                    // gather E and B to the particle positions, each with its own order
+                    doDarwinGatherVectorField(e_shape, e_galerkin, xp, yp, zp, Exp, Eyp, Ezp,
+                                              ex_arr, ey_arr, ez_arr, ex_type, ey_type, ez_type,
+                                              dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                    doDarwinGatherVectorField(b_shape, false, xp, yp, zp, Bxp, Byp, Bzp,
+                                              bx_arr, by_arr, bz_arr, bx_type, by_type, bz_type,
+                                              dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                }
+
+                // Externally applied E and B-field in Cartesian co-ordinates
+                [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+                if constexpr (exteb_control == has_exteb) {
+                    getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+                }
+
+                amrex::ParticleReal qp = q;
+                if (ion_lev) { qp *= ion_lev[ip]; }
+
+                if (do_crr) {
+                    UpdateMomentumBorisWithRadiationReaction(ux[ip], uy[ip], uz[ip],
+                                                             Exp, Eyp, Ezp, Bxp,
+                                                             Byp, Bzp, qp, mass, dt,
+                                                             MomentumPushType::Full);
+                } else if (pusher_algo == ParticlePusherAlgo::Boris) {
+                    UpdateMomentumBoris( ux[ip], uy[ip], uz[ip],
+                                         Exp, Eyp, Ezp, Bxp,
+                                         Byp, Bzp, qp, mass, dt, MomentumPushType::Full);
+                } else if (pusher_algo == ParticlePusherAlgo::Vay) {
+                    UpdateMomentumVay( ux[ip], uy[ip], uz[ip],
+                                       Exp, Eyp, Ezp, Bxp,
+                                       Byp, Bzp, qp, mass, dt, MomentumPushType::Full);
+                } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( ux[ip], uy[ip], uz[ip],
                                                Exp, Eyp, Ezp, Bxp,
                                                Byp, Bzp, qp, mass, dt);

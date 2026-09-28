@@ -1199,64 +1199,6 @@ PhysicalParticleContainer::SplitParticles (int lev)
     addParticles(pctmp_split,local_flag);
 }
 
-namespace
-{
-    /**
-     * \brief Gather a vector field F at the particle position with shape order
-     *  \p order, optionally one order lower along each component's own direction
-     *  (\p reduce_para), for the semi-implicit Darwin pushes.
-     *
-     *  On the Yee grid, the reduced order is the Galerkin scheme used for E by
-     *  doGatherShapeN; without it, this is the gather the mass matrices use for B.
-     */
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void doDarwinGatherVectorField (
-        int order, bool reduce_para,
-        amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
-        amrex::ParticleReal& Fxp, amrex::ParticleReal& Fyp, amrex::ParticleReal& Fzp,
-        amrex::Array4<amrex::Real const> const& Fx_arr,
-        amrex::Array4<amrex::Real const> const& Fy_arr,
-        amrex::Array4<amrex::Real const> const& Fz_arr,
-        amrex::IndexType Fx_type, amrex::IndexType Fy_type, amrex::IndexType Fz_type,
-        const amrex::XDim3& dinv, const amrex::XDim3& xyzmin, const amrex::Dim3& lo,
-        int n_rz_azimuthal_modes)
-    {
-        if (order == 1) {
-            if (reduce_para) {
-                doDirectGatherVectorField<1,0>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            } else {
-                doDirectGatherVectorField<1,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            }
-        } else if (order == 2) {
-            if (reduce_para) {
-                doDirectGatherVectorField<2,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            } else {
-                doDirectGatherVectorField<2,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            }
-        } else if (order == 3) {
-            if (reduce_para) {
-                doDirectGatherVectorField<3,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            } else {
-                doDirectGatherVectorField<3,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            }
-        } else if (order == 4) {
-            if (reduce_para) {
-                doDirectGatherVectorField<4,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            } else {
-                doDirectGatherVectorField<4,4>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
-                    Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
-            }
-        }
-    }
-}
-
 void
 PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
@@ -1506,10 +1448,10 @@ PhysicalParticleContainer::PushPDarwin (int lev, Real dt,
 
                 if (!t_do_not_gather){
                     // gather E and B to the particle positions, each with its own order
-                    doDarwinGatherVectorField(e_shape, e_galerkin, xp, yp, zp, Exp, Eyp, Ezp,
+                    doDirectGatherVectorField(e_shape, e_galerkin, xp, yp, zp, Exp, Eyp, Ezp,
                                               ex_arr, ey_arr, ez_arr, ex_type, ey_type, ez_type,
                                               dinv, xyzmin, lo, n_rz_azimuthal_modes);
-                    doDarwinGatherVectorField(b_shape, false, xp, yp, zp, Bxp, Byp, Bzp,
+                    doDirectGatherVectorField(b_shape, false, xp, yp, zp, Bxp, Byp, Bzp,
                                               bx_arr, by_arr, bz_arr, bx_type, by_type, bz_type,
                                               dinv, xyzmin, lo, n_rz_azimuthal_modes);
                 }

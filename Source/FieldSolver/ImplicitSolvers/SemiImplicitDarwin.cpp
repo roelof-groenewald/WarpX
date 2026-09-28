@@ -136,7 +136,8 @@ void SemiImplicitDarwin::PrintParameters () const
 
 int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
                                                    amrex::Real  a_dt,
-                                                   int          a_step )
+                                                   int          a_step,
+                                                   bool verbose_step)
 {
     BL_PROFILE("SemiImplicitDarwin::OneStep()");
 
@@ -202,6 +203,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
     // ApplyScaledMassMatrices), i.e. the linear response of the deposited
     // current to the inductive E-field that this solve produces.
+    int const verbosity = verbose_step ? m_linsol_verbose_int : 0;
+    m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
     // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
@@ -347,16 +350,16 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
     m_WarpX->DepositMassMatrices();
 
+    // The deposit routine only fills half of each diagonal mass matrix's
+    // band (exploiting symmetry); mirror the other half to complete
+    // deposition before boundary summation.
+    FinishMassMatricesDeposition();
+
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
-
-    // The deposit routine only fills half of each diagonal mass matrix's
-    // band (exploiting symmetry); mirror the other half back in now that
-    // deposition and boundary summation are complete.
-    FinishMassMatrices();
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()

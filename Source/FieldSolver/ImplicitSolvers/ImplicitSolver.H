@@ -67,7 +67,8 @@ public:
      */
     virtual int OneStep (amrex::Real  a_time,
                          amrex::Real  a_dt,
-                         int          a_step) = 0;
+                         int          a_step,
+                         bool verbose_step) = 0;
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -170,7 +171,7 @@ public:
     /**
      * \brief Finish filling the mass matrices after deposit
      */
-    void FinishMassMatrices ();
+    void FinishMassMatricesDeposition ();
 
     /**
      * \brief Finish the implicit particle update after the converged time-centered solve

@@ -39,8 +39,21 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
             "conditions in all directions.");
     }
 
-    // Define dA MultiFabs
+    // The mass matrices are summed over their guard cells before being applied
+    // to dA (which has the E-field guard cells) in the linear solve, so that
+    // their stencil reaches one cell beyond the guard cells of J (see
+    // guardCellManager::Init).
     using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->nGrowVect();
+        const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev)->nGrowVect();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            ngE.allGE(ngJ + 1),
+            "The semi-implicit Darwin solver requires at least one more guard "
+            "cell for E than for J.");
+    }
+
+    // Define dA MultiFabs
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Ex = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev)->boxArray();
         const auto& ba_Ey = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{1}, lev)->boxArray();

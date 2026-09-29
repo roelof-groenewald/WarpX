@@ -124,6 +124,10 @@ public:
     /**
      * \brief Deposit mass matrices.
      *
+     * \param[in,out] fields the field register holding the mass matrices, which are
+     *                reset before the deposition
+     * \param[in] lev mesh refinement level for the deposition
+     * \param[in] dt time step for the particle level
      * \param[in] particle_shape order of the particle shape factors used for the deposition
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,

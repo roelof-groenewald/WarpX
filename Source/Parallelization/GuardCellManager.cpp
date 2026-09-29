@@ -46,6 +46,7 @@ guardCellManager::Init (
     const int nox_fft, const int noy_fft, const int noz_fft,
     const int nci_corr_stencil,
     const ElectromagneticSolverAlgo electromagnetic_solver_id,
+    const CurrentDepositionAlgo current_deposition_algo,
     const EvolveScheme evolve_scheme,
     const int max_level,
     const amrex::Vector<amrex::Real>& v_galilean,
@@ -174,9 +175,12 @@ guardCellManager::Init (
                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // When using these implicit schemes, the speed of light Courant limit may be significantly
         // violated, but the number of guard cells only need to be adjusted based on the particle motion.
+        // Integer division below: nox / 2 = 0, 0, 1, 1, 2 for nox = 0, 1, 2, 3, 4.
+        // Esirkepov deposition requires one additional guard cell.
+        const int extra = (current_deposition_algo == CurrentDepositionAlgo::Esirkepov) ? 1 : 0;
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
-            ng_alloc_Rho[i] = nox + particle_max_grid_crossings - 1;
-            ng_alloc_J[i]   = nox + particle_max_grid_crossings - 1;
+            ng_alloc_Rho[i] = nox / 2 + particle_max_grid_crossings + extra;
+            ng_alloc_J[i]   = nox / 2 + particle_max_grid_crossings + extra;
         }
     }
 

@@ -176,7 +176,11 @@ guardCellManager::Init (
         // When using these implicit schemes, the speed of light Courant limit may be significantly
         // violated, but the number of guard cells only need to be adjusted based on the particle motion.
         // Integer division below: nox / 2 = 0, 0, 1, 1, 2 for nox = 0, 1, 2, 3, 4.
-        // Esirkepov deposition requires one additional guard cell.
+        // For direct deposition, the current is deposited using the time-centered particle position,
+        // limiting the additional stencil extent due to particle motion.
+        // Villasenor deposition obtains the same guard-cell requirement by using a shape factor of
+        // order `m-1` for cell-centered quantities in the normal direction.
+        // Esirkepov uses the full order `m` independent of grid staggering and therefore requires one additional guard cell.
         const int extra = (current_deposition_algo == CurrentDepositionAlgo::Esirkepov) ? 1 : 0;
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
             ng_alloc_Rho[i] = nox / 2 + particle_max_grid_crossings + extra;

@@ -748,7 +748,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -756,7 +756,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type, WarpX::nox);
                     }
                     if (has_buffer)
                     {
@@ -766,7 +766,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
-                                       lev, lev-1, dt, relative_time, push_type);
+                                       lev, lev-1, dt, relative_time, push_type, WarpX::nox);
                     }
                 } // end of "if skip_deposition"
 
@@ -864,7 +864,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
 void
 PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                                                int lev, Real dt)
+                                                int lev, Real dt, int particle_shape)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
@@ -916,7 +916,8 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
             amrex::MultiFab * Szz = fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
             WarpXParticleContainer::DepositMassMatrices(pti, wp, uxp, uyp, uzp,
                               Sxx, Sxy, Sxz, Syx, Syy, Syz, Szx, Szy, Szz,
-                              bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt);
+                              bxfab, byfab, bzfab, 0, np_to_deposit, thread_num, lev, lev, dt,
+                              particle_shape);
 
             amrex::Gpu::synchronize();
         }

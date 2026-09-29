@@ -141,6 +141,14 @@ private:
     bool m_predictor_use_galerkin = false;
 
     /**
+     * \brief Order of the particle shape factors used for the magnetostatic part
+     *  of the solve: the current and mass matrices deposition, the E-field gather
+     *  in the corrector push and the B-field gather in both pushes. Must not
+     *  exceed algo.particle_shape, which is used for the electrostatic part.
+     */
+    int m_ms_particle_shape = 1;
+
+    /**
      * \brief Choice of linear solver
      */
     LinearSolverType m_linear_solver_type = LinearSolverType::amrex_gmres;

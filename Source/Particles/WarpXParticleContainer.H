@@ -49,6 +49,7 @@
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -260,9 +261,10 @@ public:
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                                       int lev,
-                                      amrex::Real dt)
+                                      amrex::Real dt,
+                                      int particle_shape)
     {
-        amrex::ignore_unused(fields,lev,dt);
+        amrex::ignore_unused(fields,lev,dt,particle_shape);
     }
 
     /**
@@ -330,10 +332,13 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time,
-                         PushType push_type = PushType::Explicit);
+                         PushType push_type = PushType::Explicit,
+                         std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
@@ -399,7 +404,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                int particle_shape);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *
@@ -467,7 +473,8 @@ public:
                               int thread_num,
                               int lev,
                               int depos_lev,
-                              amrex::Real dt);
+                              amrex::Real dt,
+                              int particle_shape);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and

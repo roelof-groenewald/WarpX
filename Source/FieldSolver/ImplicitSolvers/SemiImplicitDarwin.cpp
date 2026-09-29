@@ -16,37 +16,6 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
-namespace
-{
-    /**
-     * \brief Temporarily set the global particle shape (WarpX::nox, noy, noz)
-     *  to the shape used for the magnetostatic part of the Darwin solve, and
-     *  restore algo.particle_shape when the object goes out of scope.
-     */
-    struct ScopedMagnetostaticShape
-    {
-        explicit ScopedMagnetostaticShape (int ms_particle_shape)
-            : m_nox{WarpX::nox}, m_noy{WarpX::noy}, m_noz{WarpX::noz}
-        {
-            WarpX::nox = ms_particle_shape;
-            WarpX::noy = ms_particle_shape;
-            WarpX::noz = ms_particle_shape;
-        }
-        ~ScopedMagnetostaticShape ()
-        {
-            WarpX::nox = m_nox;
-            WarpX::noy = m_noy;
-            WarpX::noz = m_noz;
-        }
-        ScopedMagnetostaticShape (const ScopedMagnetostaticShape&) = delete;
-        ScopedMagnetostaticShape& operator= (const ScopedMagnetostaticShape&) = delete;
-        ScopedMagnetostaticShape (ScopedMagnetostaticShape&&) = delete;
-        ScopedMagnetostaticShape& operator= (ScopedMagnetostaticShape&&) = delete;
-
-        int m_nox, m_noy, m_noz;
-    };
-}
-
 void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 {
     amrex::ignore_unused(from_restart);
@@ -135,10 +104,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Initialize the mass matrices for plasma response (their stencil width
     // is set by the magnetostatic particle shape)
-    {
-        const ScopedMagnetostaticShape ms_shape(m_ms_particle_shape);
-        InitializeMassMatrices();
-    }
+    InitializeMassMatrices(m_ms_particle_shape);
 
     // The predictor velocity push in OneStep() gathers the electrostatic E-field
     // with the Galerkin scheme, i.e. with the same shape-factor order used for the
@@ -224,10 +190,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     PrepareVelocitiesForCurrentDeposition();
 
     // Accumulate current* and the mass matrices (with the magnetostatic shape)
-    {
-        const ScopedMagnetostaticShape ms_shape(m_ms_particle_shape);
-        AccumulateCurrentAndMassMatrices();
-    }
+    AccumulateCurrentAndMassMatrices();
 
     // Python callback insertion
     ExecutePythonCallback("afterdeposition");
@@ -385,17 +348,19 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     const int lev = 0;
 
     // Deposit the current density from all species, using the time-centered
-    // particle velocities as appropriate for the implicit push. This also
-    // resets the current MultiFabs before depositing.
+    // particle velocities as appropriate for the implicit push and the
+    // magnetostatic particle shape. This also resets the current MultiFabs
+    // before depositing.
     m_WarpX->GetPartContainer().DepositCurrent(
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
-        m_dt, 0.0_rt, PushType::Implicit);
+        m_dt, 0.0_rt, PushType::Implicit, m_ms_particle_shape);
 
     // Zero and accumulate the mass matrices from all species. This shares the
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
-    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices();
+    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
+    // here with the magnetostatic particle shape.
+    m_WarpX->DepositMassMatrices(m_ms_particle_shape);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete

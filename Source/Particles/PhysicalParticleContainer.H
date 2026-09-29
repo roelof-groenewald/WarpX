@@ -116,7 +116,8 @@ public:
      */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                               int lev,
-                              amrex::Real dt) override;
+                              amrex::Real dt,
+                              int particle_shape) override;
 
     void PushPDarwin (int lev, amrex::Real dt,
                       const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,

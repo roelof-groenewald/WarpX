@@ -71,6 +71,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
 
+    // Initialize the mass matrices for plasma response (their stencil width is
+    // set by the magnetostatic particle shape). This has to come before the
+    // linear operator is defined below, since the operator sizes its scratch
+    // space from the mass matrix stencil.
+    InitializeMassMatrices(m_ms_particle_shape);
+
     // Get the linear solver input parameters
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
     pp_l.query("verbose_int",         m_linsol_verbose_int);
@@ -101,10 +107,6 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setVerbose( m_linsol_verbose_int );
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
-
-    // Initialize the mass matrices for plasma response (their stencil width
-    // is set by the magnetostatic particle shape)
-    InitializeMassMatrices(m_ms_particle_shape);
 
     // The predictor velocity push in OneStep() gathers the electrostatic E-field
     // with the Galerkin scheme, i.e. with the same shape-factor order used for the
@@ -596,9 +598,14 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
     // The mass matrices were summed over their guard cells (SyncMassMatrices),
     // so that the stencil of a valid cell reaches one cell beyond the guard
     // cells of J (see guardCellManager::Init). Only the valid cells of rhs are
-    // checked, since its guard cells are overwritten by FillBoundaryAndSync below.
+    // checked here.
     AssertMassMatricesStencilNotClipped(rhs, dA);
 
+    // No guard-cell exchange is needed on the result: ApplyMassMatrices()
+    // already fills as many guard cells of `rhs` as `rhs` and the mass matrices
+    // have in common, computing them from the same wide-stencil read of `dA`
+    // that the valid region uses. The caller sizes `rhs` so that this covers
+    // whatever it goes on to read.
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
@@ -606,13 +613,6 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
         /* a_baseline      = */ nullptr,
         /* a_scale         = */ scale,
         /* a_zero_out_first = */ false);
-
-    for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
-        // Fill and sync guard cells & edges
-        rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-    }
 }
 
 void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const

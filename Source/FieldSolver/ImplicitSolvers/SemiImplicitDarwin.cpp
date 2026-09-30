@@ -159,7 +159,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // corrector push and the mass matrices below.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        m_WarpX->GetPartContainer().PushPDarwin(
+        m_WarpX->GetPartContainer().PushP(
             lev,
             m_dt,
             *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
@@ -168,8 +168,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            /*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
-            /*b_shape=*/WarpX::nox
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
+                              /*b_shape=*/WarpX::nox}
         );
     }
 
@@ -222,7 +223,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // same as in the predictor push and the mass matrices.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        m_WarpX->GetPartContainer().PushPDarwin(
+        m_WarpX->GetPartContainer().PushP(
             lev,
             m_dt,
             *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
@@ -231,7 +232,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            /*e_shape=*/WarpX::nox, /*e_galerkin=*/false, /*b_shape=*/WarpX::nox
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/false,
+                              /*b_shape=*/WarpX::nox}
         );
     }
 

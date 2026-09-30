@@ -98,10 +98,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     InitializeMassMatrices();
 
     // The predictor velocity push in OneStep() gathers the electrostatic E-field
-    // with the Galerkin scheme, i.e. with the same shape-factor order used for the
-    // charge deposition. Skip that, and warn, if the user has explicitly selected
-    // momentum-conserving gathering, since forcing Galerkin gathering there would
-    // silently negate that choice.
+    // with the Galerkin scheme. Skip that, and warn, if the user has explicitly
+    // selected momentum-conserving gathering, since forcing Galerkin gathering
+    // there would silently negate that choice.
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
     if (!m_predictor_use_galerkin) {
         ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",

@@ -97,10 +97,9 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Initialize the mass matrices for plasma response
     InitializeMassMatrices();
 
-    // The predictor velocity push in OneStep() gathers the electrostatic E-field
-    // with the Galerkin scheme. Skip that, and warn, if the user has explicitly
-    // selected momentum-conserving gathering, since forcing Galerkin gathering
-    // there would silently negate that choice.
+    // The predictor velocity push gathers the electrostatic E-field with the
+    // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
+    // momentum-conserving gathering.
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
     if (!m_predictor_use_galerkin) {
         ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
@@ -155,8 +154,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
     // the E-field was cleared during the last Poisson solve). E is gathered with the
     // Galerkin scheme (unless the user explicitly requested momentum-conserving
-    // gathering - see the warning issued in Define()). B is gathered exactly as in the
-    // corrector push and the mass matrices below.
+    // gathering). B is gathered exactly as in the corrector push.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(

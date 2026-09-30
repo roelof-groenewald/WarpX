@@ -319,8 +319,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
     ABLASTR_PROFILE("RigidInjectedParticleContainer::PushP");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!gather_orders.has_value(),
-        "Explicit field gather orders (used by the semi-implicit Darwin solver) "
-        "are not supported for rigid-injected species");
+        "Explicit field gather orders are not supported for rigid-injected species");
 
     if (do_not_push) { return; }
 

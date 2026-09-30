@@ -19,10 +19,8 @@
 /**
  * \brief Gather vector field F for a single particle
  *
- * \tparam depos_order_perp       Particle shape order along the directions perpendicular
- *                                to each field component
- * \tparam depos_order_para       Particle shape order along the direction of each field
- *                                component
+ * \tparam depos_order_perp       Particle shape order in perpendicular direction
+ * \tparam depos_order_para       Particle shape order in parallel direction
  *
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle

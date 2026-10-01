@@ -1315,6 +1315,10 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
                 if (!t_do_not_gather){
                     // first gather E and B to the particle positions
+                    // (capture the variables outside of the constexpr-if, as required by nvcc)
+                    [[maybe_unused]] const auto& nox_tmp = nox;
+                    [[maybe_unused]] const auto& galerkin_tmp = galerkin_interpolation;
+                    [[maybe_unused]] const auto& orders_tmp = orders;
                     if constexpr (gather_control == fused_gather) {
                         doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                        ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,

@@ -126,6 +126,15 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
         Zscratch[ii]->FillBoundaryAndSync(warpx_ptr->Geom(lev).periodicity());
     }
 
+    // At conducting (PEC) walls, fill Zscratch's guard cells with the B-type
+    // image symmetry (covering the bilaplacian stencil below) and zero the
+    // wall-normal components of the iterate on the wall. Together with the
+    // corresponding zeroing of the operator output and of the source, this
+    // makes GMRES solve the reflected half-domain problem. This must come
+    // after the periodic fill above so that the mirror reads (and corner
+    // guard cells) see valid data.
+    m_ops->ApplyPECtoZ(Zscratch, lev, Zscratch[0]->nGrowVect());
+
     // Evaluation of the (single) 4th-order field equation:
     // bilaplacian(Z), discretized directly in a single pass.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeVectorBiLaplacian(
@@ -147,6 +156,12 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
         // clear E_temp since ApplyScaledMassMatrices accumulates into its rhs argument
         E_temp[lev][ii]->setVal(0);
     }
+
+    // At conducting (PEC) walls, fill dA's guard cells with the E-type image
+    // symmetry before the mass matrices are applied below: the guard-cell
+    // mass-matrix deposits multiply these beyond-wall dA values.
+    m_ops->ApplyPECtodA(dA_fp[lev], lev, dA_fp[lev][0]->nGrowVect());
+
     // Calculate chi dA (the scaled mass matrices applied to dA) and write into E_temp
     m_ops->ApplyScaledMassMatrices(E_temp, dA_fp);
 
@@ -178,4 +193,13 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     {
         rhs_vec[lev][ii]->FillBoundaryAndSync(warpx_ptr->Geom(lev).periodicity());
     }
+
+    // Project the operator output at conducting (PEC) walls: zero the
+    // constrained wall-normal rows so that they stay trivially satisfied for
+    // every Krylov vector (rhs_vec has no guard cells, so only the on-wall
+    // zeroing is performed). Also remove the (roundoff-level) component of
+    // the output along the constant null vectors of the operator, so that the
+    // Krylov space stays orthogonal to them, as the source is.
+    m_ops->ApplyPECtoZ(rhs_vec[lev], lev, amrex::IntVect(0));
+    m_ops->ProjectOutNullConstants(rhs_vec[lev], lev);
 }

@@ -433,6 +433,9 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
+        - The field boundary conditions must be ``periodic`` or ``pec`` (conducting walls) in each
+          direction, in 1D, 2D and 3D Cartesian geometries. Other geometries must be fully periodic.
+          With PEC walls, ``particles.crop_on_PEC_boundary`` is not supported.
 
       - **Particle shapes:**
         The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.

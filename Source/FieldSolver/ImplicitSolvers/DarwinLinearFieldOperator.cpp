@@ -141,6 +141,10 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
         rhs_vec[lev], Zscratch, warpx_ptr->GetEBUpdateBFlag()[lev], lev
     );
 
+    // Constrain the curl-free modes of Z, which the curl(chi curl(Z)) term
+    // below annihilates, with the grad-div penalty term (no-op unless enabled)
+    m_ops->AddGradDivZTerm(rhs_vec[lev], Zscratch, lev);
+
     // Calculate dA = curl(Z)
     // Use Zscratch (guard cells already filled above) rather than Zvec directly.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(

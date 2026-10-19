@@ -181,6 +181,7 @@ class DarwinPECWalls(object):
         simulation.particle_shape = 1
         simulation.verbose = self.verbose
         simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
+            graddiv_factor=1.0,
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=5e-5,
                 max_iterations=200,

@@ -817,7 +817,7 @@ std::unique_ptr<MatrixSolverOps<WarpXSolverVec>> ImplicitSolver::MakePCMatrixOps
     return ops;
 }
 
-void ImplicitSolver::InitializeMassMatrices ()
+void ImplicitSolver::InitializeMassMatrices (int particle_shape)
 {
 
     // Initializes the MassMatrices and MassMatrices_PC containers
@@ -843,7 +843,9 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const int shape = WarpX::nox;
+    // The mass matrices are deposited with the shape their stencil is sized for
+    m_implicit_options.particle_shape = particle_shape;
+    const int shape = particle_shape;
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 

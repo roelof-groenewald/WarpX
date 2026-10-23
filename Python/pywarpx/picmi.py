@@ -2153,9 +2153,28 @@ class SemiImplicitDarwinEvolveScheme(EvolveSchemeBase):
     # There is no nonlinear solver for the linear solver to attach to, which
     # PETScKSPLinearSolver requires.
     linear_solver: GMRESLinearSolver = Field(description="The GMRES linear solver")
+    ms_particle_shape: int | None = Field(
+        default=None,
+        description="Order of the particle shape factors used for the magnetostatic part of "
+        "the solve (current and mass matrices deposition, inductive E-field gather and "
+        "B-field gather). Must be between 1 and the particle shape used for the "
+        "electrostatic part (the `particle_shape` of the Simulation), which is the default.",
+    )
+
+    graddiv_factor: float | None = Field(
+        default=None,
+        description="Multiplier of the grad-div (Coulomb-gauge penalty) term added to the "
+        "Darwin field operator, which lifts the otherwise nearly singular curl-free modes of "
+        "the auxiliary field to the eigenvalue scale of the solenoidal modes, without changing "
+        "the solution. The penalty coefficient is this factor times the domain-mean plasma "
+        "susceptibility. Defaults to 0 (disabled).",
+    )
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.ms_particle_shape = self.ms_particle_shape
+        implicit_evolve.graddiv_factor = self.graddiv_factor
         self.linear_solver.linear_solver_initialize_inputs()
 
 

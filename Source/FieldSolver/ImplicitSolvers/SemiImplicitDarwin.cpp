@@ -142,6 +142,13 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
 
+    // Initialize the mass matrices for plasma response (their stencil width is
+    // set by the magnetostatic particle shape). This has to come before the
+    // linear operator is defined below, since the operator sizes its scratch
+    // space from the mass matrix stencil.
+    InitializeMassMatrices(m_ms_particle_shape);
+    InitializeImplicitOptions();
+
     // Get the linear solver input parameters
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
     pp_l.query("verbose_int",         m_linsol_verbose_int);
@@ -172,11 +179,6 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setVerbose( m_linsol_verbose_int );
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
-
-    // Initialize the mass matrices for plasma response (their stencil width
-    // is set by the magnetostatic particle shape)
-    InitializeMassMatrices(m_ms_particle_shape);
-    InitializeImplicitOptions();
 
     // The predictor velocity push gathers the electrostatic E-field with the
     // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
@@ -733,10 +735,15 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
 
     // The mass matrices were summed over their guard cells (SyncMassMatrices),
     // so that the stencil of a valid cell reaches one cell beyond the guard
-    // cells of J (see guardCellManager::Init). Only the valid cells of rhs are
-    // checked, since its guard cells are overwritten by FillBoundaryAndSync below.
+    // cells of J (see guardCellManager::Init). Check that dA has enough guard
+    // cells for the valid cells of rhs not to be clipped.
     AssertMassMatricesStencilNotClipped(rhs, dA);
 
+    // Without PEC walls, no guard-cell exchange is needed on the result: ApplyMassMatrices()
+    // already fills as many guard cells of `rhs` as `rhs` and the mass matrices
+    // have in common, computing them from the same wide-stencil read of `dA`
+    // that the valid region uses. The caller sizes `rhs` so that this covers
+    // whatever it goes on to read.
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
@@ -745,20 +752,22 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
         /* a_scale         = */ scale,
         /* a_zero_out_first = */ false);
 
-    for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
-        // At conducting (PEC) walls, fold the guard-cell products (from the
-        // guard-cell mass-matrix deposits, which are not folded themselves,
-        // and the image-filled dA values) back into the domain and set image
-        // guard values, consistently with the fold of the deposited current
-        // (see AccumulateCurrentAndMassMatrices). This must precede the
-        // FillBoundaryAndSync below so that neighboring boxes' guard cells
-        // pick up the folded valid values.
-        FoldGuardCellsAtPEC(rhs[lev], lev);
-
-        // Fill and sync guard cells & edges
-        rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+    // At conducting (PEC) walls, fold the guard-cell products (from the
+    // guard-cell mass-matrix deposits, which are not folded themselves, and the
+    // image-filled dA values) back into the domain and set image guard values,
+    // consistently with the fold of the deposited current (see
+    // AccumulateCurrentAndMassMatrices). The fold changes valid cells next to
+    // the walls, so, unlike in the periodic case, the guard cells of rhs must
+    // then be re-exchanged for neighboring boxes to pick up the folded values.
+    // The caller sizes rhs to hold all the guard-cell deposits of the mass
+    // matrices when there is a PEC wall (see DarwinLinearFieldOperator::define).
+    if (m_has_pec) {
+        for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
+            FoldGuardCellsAtPEC(rhs[lev], lev);
+            rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+            rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+            rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+        }
     }
 }
 

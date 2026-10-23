@@ -92,7 +92,7 @@ amrex::ParticleReal GetImplicitGammaInverse (const amrex::ParticleReal uxp_n,
     const amrex::ParticleReal gamma_np1 = std::sqrt(1._prt + (uxp_np1*uxp_np1 + uyp_np1*uyp_np1 + uzp_np1*uzp_np1)*inv_c2);
     const amrex::ParticleReal gaminv = 2._prt/(gamma_n + gamma_np1);
 
-    return gaminv;
+    return 1.0_prt; // gaminv;
 }
 
 /** \brief Push the particle's positions over one timestep,

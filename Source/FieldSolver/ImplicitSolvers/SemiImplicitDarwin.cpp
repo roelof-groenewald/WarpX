@@ -451,15 +451,22 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
-    m_WarpX->FinalizeJ();
 
-    // At conducting (PEC) walls, fold the guard-cell current deposited by
-    // particles near the wall back into the domain, and set image guard
-    // values, which curl(J) in CalculateSourceVector() reads. No-op for
-    // periodic boundaries. See FoldGuardCellsAtPEC() for why this always uses
-    // the PEC fold convention, whatever the particle boundary condition.
-    FoldGuardCellsAtPEC(
-        m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev), lev);
+    // Apply the current boundary conditions. At conducting (PEC) walls, fold
+    // the guard-cell current deposited by particles near the wall back into
+    // the domain, and set image guard values, which curl(J) in
+    // CalculateSourceVector() reads. See FoldGuardCellsAtPEC() for why this
+    // always uses the PEC fold convention, whatever the particle boundary
+    // condition. It replaces WarpX::FinalizeJ(), whose fold follows the
+    // particle boundary condition: applying both would fold the current twice
+    // (with reflecting particles, the two folds cancel the current within the
+    // guard-cell depth of the wall).
+    if (m_has_pec) {
+        FoldGuardCellsAtPEC(
+            m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev), lev);
+    } else {
+        m_WarpX->FinalizeJ();
+    }
 
     // Sum boundaries for mass matrices.
     // At conducting (PEC) walls the mass matrices are deliberately NOT folded:
